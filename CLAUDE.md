@@ -24,4 +24,10 @@ These rules apply to every session in this project.
 - Follow [docs/build-windows.md](docs/build-windows.md): run CMake from inside `darknet/build`, use `-DDARKNET_TRY_OPENBLAS=OFF`, install to `build/install/`, and point DarkHelp at a **copy** of a `.cfg` in `models/pretrained/` (it rewrites cfg files).
 - oneAPI 2026.1 lives at `C:\Program Files (x86)\Intel\oneAPI\2026.1`. Use `2026.1\oneapi-vars.bat` with `vswhere` on PATH and `NoDefaultCurrentDirectoryInExePath` cleared (see `tools\sycl-check\build.bat`). `icx` takes MSVC-style flags on Windows.
 - SYCLomatic runs in WSL **Ubuntu** (`~/sdk`, no root). Don't touch the `Nvidia_SDKM_*` WSL distros. Use `tools/sycl-migrate/*.sh`.
+- **DarkStudio app**:
+  - `server/` (C++20, Drogon from vcpkg, MSVC + VS generator) and `web/` (React + TS, Vite). See [docs/darkstudio-ui.md](docs/darkstudio-ui.md).
+  - After server changes, run `server\build\Release\darkstudio-tests.exe`. After UI changes, run `npm run lint` and `npm run build` in `web/`.
+  - Stop a running `darkstudio-server.exe` before rebuilding (the exe is locked).
+  - Verify the UI with headless Edge screenshots (`msedge --headless=new --screenshot=... --virtual-time-budget=8000 http://localhost:8765/#/<page>`).
+  - New UI text needs both `en` and `he` strings in `web/src/i18n.ts`. Store selectors must return state slices, never new arrays.
 - OpenVINO 2026.4.1 lives at `C:\src\openvino` (see [docs/intel-gpu.md](docs/intel-gpu.md)). Always enable the model cache (`build/ov-cache`) and use the Iris Xe at FP16 by default.

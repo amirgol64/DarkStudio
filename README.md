@@ -16,8 +16,9 @@ DarkStudio is a free, open-source computer-vision toolchain. It lets you label, 
 | `tools/sycl-migrate/` | Scripts to convert Darknet's CUDA kernels to SYCL with SYCLomatic (WSL), import them into the fork, build Darknet with SYCL (`build-darknet-sycl.bat`), and compare CPU vs SYCL results (`compare-cpu-sycl.ps1`) | Apache-2.0 |
 | `tools/train-test/` | Prepare a small dataset (LEGO Gears, local testing only, CC BY-NC-SA) for CPU vs Intel GPU training comparisons | Apache-2.0 |
 | `docs/` | [Windows build](docs/build-windows.md), [Intel GPU](docs/intel-gpu.md) | Apache-2.0 |
-| `server/` | C++ backend (Drogon). Planned | Apache-2.0 |
-| `web/` | React + TypeScript web UI. Planned | Apache-2.0 |
+| `server/` | C++20 backend (Drogon): REST + WebSocket, job runner for Darknet / OpenVINO / training, datasets API, unit tests. **v0** | Apache-2.0 |
+| `web/` | React + TypeScript web UI: Devices, Benchmarks, Training (live charts), Logs & errors, Annotation, Settings; EN + HE (RTL). **v0** | Apache-2.0 |
+| `darkstudio.bat` | One command: build if needed, start the server, open the UI | Apache-2.0 |
 
 ## Hardware support
 
@@ -65,6 +66,14 @@ git -C darknet  remote add upstream https://codeberg.org/CCodeRun/darknet.git
 git -C DarkHelp remote add upstream https://codeberg.org/CCodeRun/DarkHelp.git
 git -C DarkMark remote add upstream https://codeberg.org/CCodeRun/DarkMark.git
 ```
+
+## Run DarkStudio
+
+```bat
+darkstudio.bat
+```
+
+This builds the C++ server and the web UI the first time, then opens **http://localhost:8765/**. From there you can see which devices and backends work, run OpenVINO and CPU-vs-Intel-GPU benchmarks, train on the Iris Xe with live loss and mAP charts, follow logs with errors highlighted, label images, and change settings. See [docs/darkstudio-ui.md](docs/darkstudio-ui.md) for details, the API, and development mode. The server only listens on localhost (no login until multi-user mode).
 
 ## Building
 

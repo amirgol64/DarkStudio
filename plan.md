@@ -51,6 +51,7 @@ DarkStudio is a free, open-source toolchain for computer vision. It brings label
 | 31 | CPU math on Windows | **No OpenBLAS.** Darknet's built-in AVX2 + OpenMP GEMM measured ~20× faster than vcpkg's MSVC-built OpenBLAS. CPU baseline for yolov4-tiny: ~160–180 ms per image |
 | 32 | Intel GPU inference | **OpenVINO 2026.4.1** (C++ runtime, `C:\src\openvino`). Iris Xe at FP16 is the default device, with the model cache always on. yolov4-tiny runs at 11.8 ms (85 FPS) |
 | 33 | Intel GPU training toolchain | **oneAPI 2026.1** (icx, oneMKL, oneDNN) on Windows. **SYCLomatic in WSL Ubuntu** (CUDA 12.9 headers, no root). SYCL becomes a 3rd Darknet GPU backend (`DARKNET_GPU_SYCL`) without cuDNN, like ROCm |
+| 34 | UI v0 | Built as the real app (Drogon server + React UI), not a throwaway dashboard. Local only (127.0.0.1, no login until M5), one job at a time, job history as JSON files (SQLite with M1 projects), hash routing |
 
 ---
 
@@ -238,14 +239,20 @@ Moved up on 2026-10-09: the dev PC has only an Iris Xe, so GPU training on it sp
 
 ### M0c — DarkStudio UI v0: see functionality, performance and errors (after the first Iris Xe training run)
 Decided 2026-10-09: build the first slice of the **real** app (Drogon C++ server + React/TypeScript UI) instead of a throwaway dashboard, so it becomes the M1 foundation. It starts once the M0b training test works, so there's real training to show.
-- [ ] `server/`: Drogon skeleton, REST + WebSocket, job runner that launches Darknet / ov-bench / compare tools and streams their output.
-- [ ] `web/`: Vite + React + TS app shell, theme, i18n (EN + HE/RTL), navigation.
-- [ ] **Devices & backends** view: CPU / Iris Xe / OpenVINO / SYCL status, versions, memory, and detection errors.
-- [ ] **Benchmarks** view: run ov-bench and CPU-vs-SYCL comparisons from the UI. Charts of ms/FPS per backend and accuracy differences.
-- [ ] **Live training** view: start/stop/resume, live loss and mAP chart, iterations/sec, GPU memory, checkpoints.
-- [ ] **Logs & errors** view: live log stream with SYCL/JIT/compat errors highlighted and filterable.
-- [ ] **Annotation** view (first version of the M1 labeling canvas): boxes and polygons on a dataset folder.
-- [ ] **Settings** view: paths (oneAPI, OpenVINO, vcpkg, models), default device and precision, the model cache.
+- [x] `server/` (C++20, Drogon 1.9 via vcpkg, MIT): REST + WebSocket (`/ws/events`) and a job runner (Windows Job Object / POSIX process group, so stop kills the whole tree; one job at a time; per-job folder with `job.json` + `log.txt`; history reloaded at startup). Listens on 127.0.0.1 only. See `docs/darkstudio-ui.md`.
+- [x] Output parsers for Darknet training/mAP/version, ov-bench, and compare-cpu-sycl, plus a log-level classifier. **65 unit tests** use real captured output and the dataset path-safety check (`darkstudio-tests`).
+- [x] `ov-bench --list-devices` for the device probe.
+- [x] `web/`: Vite + React 19 + TS app shell, HashRouter, dark/light/system theme, i18n **EN + HE with RTL**, and a live store fed by the WebSocket (auto-reconnect). All dependencies are MIT.
+- [x] **Devices & backends** view: CPU/RAM, and Darknet CPU, Darknet SYCL (Iris Xe) and OpenVINO with versions, devices, errors and probe output, plus a required-files check.
+- [x] **Benchmarks** view: OpenVINO (device/precision/iterations) and CPU-vs-SYCL jobs from the UI, a results table, a ms-per-image chart, per-image detections and annotated images.
+- [x] **Live training** view: prepare dataset, start/stop on SYCL or CPU, a live loss / average loss / mAP chart, s/iteration, remaining time, and a one-click mAP evaluation. (GPU memory isn't shown yet; it needs Level Zero Sysman.)
+- [x] **Logs & errors** view: all jobs, live log, errors and warnings highlighted, problems-only filter, search, follow. The sidebar badge counts failed jobs.
+- [x] **Annotation** view (first version of the M1 canvas, Konva): YOLO boxes on any `datasets/` folder, draw/move/resize/delete, class keys 1–9, ←/→, Ctrl+S, and auto-save on image change. **Polygons are deferred to M1.**
+- [x] **Settings** view: all tool paths, the default OpenVINO device and precision, the model cache, theme and language (saved on the server; browsers without their own choice follow it).
+- [x] `darkstudio.bat`: one command that builds the server and UI if needed, then starts and opens the browser.
+- [x] End-to-end test: API jobs (OpenVINO 10.5 ms/95 FPS on Iris Xe, SYCL training with live metrics), 409/400 handling, history after restart, and headless-Edge screenshots of every page (dark + Hebrew RTL).
+- [ ] Translate the server-generated job titles (currently English).
+- [ ] GPU memory and utilization in the training view (Level Zero Sysman).
 
 ### M1 — MVP: label → train → infer (weeks 13–21)
 **Backend**
@@ -258,7 +265,7 @@ Decided 2026-10-09: build the first slice of the **real** app (Drogon C++ server
 - [ ] Device picker for training and inference jobs: CPU, Intel GPU (SYCL / OpenVINO from M0a/M0b), and CUDA/ROCm when present.
 
 **Frontend**
-- [ ] App shell with routing, dark/light theme, i18n scaffold (EN plus HE with RTL), and keyboard shortcuts.
+- [x] App shell with routing, dark/light theme, i18n (EN plus HE with RTL), and keyboard shortcuts (done in M0c).
 - [ ] Labeling canvas (Konva): box and polygon tools, zoom/pan, class palette, undo/redo, auto-save.
 - [ ] Image grid with virtualization (handles 100k+ images) and filters (unlabeled, class, reviewed).
 - [ ] Training dashboard: live loss and mAP charts, GPU usage, ETA, and checkpoint list.
@@ -347,6 +354,6 @@ This is the biggest research item. Code lives in `darknet/src-lib/`.
 2. ~~Build Darknet and DarkHelp on this Windows machine and record the steps in `docs/build-windows.md`.~~ Done. CPU baseline is ~160–180 ms per image.
 3. ~~**M0a:** install OpenVINO and run the first Intel GPU inference.~~ Done: 85 FPS on Iris Xe, ~13× the Darknet CPU.
 4. **M0b:** SYCL port of Darknet. **Inference on the Iris Xe is identical to the CPU (6.5× faster) and training works (~27× faster than CPU, mAP@0.50 100% on LEGO Gears).** Left: the DPCT1118 review, DarkHelp on SYCL, the training benchmark row, and the upstream offer.
-5. **M0c:** DarkStudio UI v0 (devices, benchmarks, live training, logs/errors, annotation, settings) right after the first Iris Xe training run. This scaffolds `server/` (Drogon) and `web/` (Vite + React + TS).
+5. ~~**M0c:** DarkStudio UI v0.~~ Done: `darkstudio.bat` opens it at http://localhost:8765/ (see `docs/darkstudio-ui.md`).
 6. Set up CI with the build matrix and the license gate.
 7. Continue the M1 labeling canvas from the M0c annotation view.
