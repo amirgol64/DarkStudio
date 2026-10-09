@@ -5,7 +5,7 @@ Upstream Darknet only accelerates on NVIDIA (CUDA) and AMD (ROCm). DarkStudio ad
 | Step | What | Status |
 |---|---|---|
 | **M0a: inference** | Darknet `.weights` → ONNX → **OpenVINO** on the Intel GPU | ✅ Working (2026-10-09) |
-| **M0b: training** | Port Darknet's CUDA kernels to **SYCL / oneAPI** | 🔨 In progress: toolchain ready, first migration clean (2026-10-09) |
+| **M0b: native Darknet on Intel GPU** | Darknet's CUDA kernels ported to **SYCL / oneAPI** (darknet fork, branch `sycl`) | ✅ **Inference works**: identical to CPU, 6.5× faster · 🔨 Training next |
 
 See `plan.md` §3.3 for the full strategy.
 
@@ -111,7 +111,7 @@ OpenVINO can only run models. To train on the Iris Xe, Darknet's CUDA code is po
 | Sub-group sizes | 8, 16, 32 | Warp-level code (`__shfl`) maps to sub-groups of 32 |
 | Local memory | 64 KiB | |
 | Global memory | ~14.5 GiB (shared with the system) | |
-| FP16 / FP64 | yes / **no** | Darknet's kernels use no `double`, so that's fine |
+| FP16 / FP64 | yes / **no** | No kernel declares a `double`, but some use double *literals* (`.001*x`), which promote to FP64. The inference kernels run fine. The literals are being changed to `float` (`0.001f`) before training |
 
 oneMKL SGEMM replaces cuBLAS. Convolutions in Darknet's GPU path are im2col + SGEMM, so this is the main cost of training:
 
@@ -139,6 +139,51 @@ So the GPU is **~3.5–4.5× the CPU on the same oneMKL code**. Darknet's own CP
 | DPCT1110 | 4 | blas, im2col | Large private arrays mean register pressure. Performance check |
 | DPCT1118/1121 | 3 | im2col | Group functions in divergent control flow. **Needs a correctness review** |
 | DPCT1000/1001/1124 | 3 | dark_cuda.hpp, blas | Error-check macro and async memcpy. Small manual edits |
+
+### The SYCL backend in the darknet fork
+
+The work lives on branch **`sycl`** of [amirgol64/darknet](https://github.com/amirgol64/darknet/tree/sycl). The DarkStudio submodule follows that branch.
+
+| Part | What it does |
+|---|---|
+| `src-lib/sycl/*.dp.cpp` | The 10 kernel files, converted by SYCLomatic and imported with `tools/sycl-migrate/import.sh`. The import swaps the `dpct` helpers for `dn_sycl::` ones, restores `cudaPeekAtLastError()` checks, and makes kernel lambdas capture only the struct fields they use |
+| `src-lib/darknet_sycl.hpp/.cpp` | A **CUDA-on-SYCL compatibility layer**: the ~40 CUDA runtime / cuBLAS / cuRAND calls Darknet uses, implemented with SYCL USM, in-order queues and oneMKL. Darknet's host code (`dark_cuda.cpp`, all layers, `gemm.cpp`) compiles **unchanged** |
+| CMake | `-DDARKNET_TRY_SYCL=ON` (needs icx/icpx + oneMKL), optional `-DDARKNET_SYCL_TARGETS=intel_gpu_tgllp` for AOT |
+
+Problems found and fixed while porting:
+
+| Problem | Fix |
+|---|---|
+| `queue.hpp: no matching function for call to 'submit_graph_direct_with_event_impl'` | Darknet's global `node` and `list` types (`list.hpp`) break the SYCL headers, so `<sycl/sycl.hpp>` is now included first in `darknet_internal.hpp` |
+| `Total size of kernel arguments exceeds limit! 3304 > 2048` | 19 kernels captured the whole `Layer`/`NetworkState`. They now capture only the fields they use |
+| `CHECK_CUDA(0)` doesn't compile | SYCLomatic replaces `cudaPeekAtLastError()` with `0`. The import restores the call (the compat layer supports it) |
+| AVX disabled with icx | Darknet's CMake didn't recognise `IntelLLVM`. Fixed |
+| `a.m256_f32` / `getopt.h` errors | MSVC-only code. Fixed for clang-based compilers |
+| `darknet_onnx_export` link error | The MSVC-built protobuf DLL doesn't link with icx. The SYCL build uses `-DDARKNET_TRY_ONNX=OFF` (the CPU build has the exporter) |
+| Install can't find `sycl9.dll`, `mkl_*.dll`, ... | The oneAPI runtime DLLs are under Intel's license, so the install doesn't copy them. Put `oneAPI\2026.1\bin` on `PATH` |
+
+Build, install and run:
+
+```powershell
+tools\sycl-migrate\build-darknet-sycl.bat            # configure + build + install to build\install-sycl
+$env:PATH = "C:\dev\Python_dev\draknet\build\install-sycl\bin;C:\Program Files (x86)\Intel\oneAPI\2026.1\bin;$env:PATH"
+darknet.exe --version
+# SYCL 9.0.0 (Intel oneAPI), oneMKL BLAS and RNG, cuDNN is not used
+# => 0: Intel(R) Iris(R) Xe Graphics [Level Zero, 80 compute units, fp16], 14.5 GiB
+pwsh -File tools\sycl-migrate\compare-cpu-sycl.ps1    # CPU vs SYCL detections + timing
+```
+
+### Results: native Darknet on the Iris Xe
+
+yolov4-tiny 416×416, `darknet_06_images_to_json`, 6 sample images × 3 passes (the first pass is excluded from the timing):
+
+| Build | Per image | Detections |
+|---|---|---|
+| Darknet CPU (AVX2 + OpenMP) | 180.3 ms | reference |
+| **Darknet SYCL on Iris Xe** | **27.5 ms (6.5×)** | **identical**: 16/16 detections, probability difference 0.0000, box difference 0 px |
+| (OpenVINO on Iris Xe, FP16, for comparison) | 11.8 ms | within 1% |
+
+The first image takes ~280 ms because the SYCL kernels are JIT-compiled at the first launch. AOT compilation removes that (next step). OpenVINO stays faster for pure inference (it fuses layers and uses FP16), but the native SYCL build is what makes **training** on the Iris Xe possible.
 
 ### Toolchain setup
 
@@ -177,6 +222,6 @@ Check the device and oneMKL: `tools\sycl-check\build.bat`.
 
 ## Next
 
-- M0b: add `DARKNET_TRY_SYCL` / `DARKNET_GPU_SYCL` to the darknet fork, bring in the migrated kernels, port the host side (memory, streams, cuBLAS → oneMKL), and get inference matching the CPU first, then training.
+- M0b next: single-precision literals in the kernels, then **training on the Iris Xe** (CPU vs SYCL loss curve), AOT compilation, and DarkHelp built against the SYCL Darknet.
 - Add OpenVINO as a backend in DarkHelp (`IBackend`, M2), so the tools and the server can use the Intel GPU directly.
 - Try INT8 quantization and the NPU on newer Intel CPUs (M6).
