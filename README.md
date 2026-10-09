@@ -14,6 +14,7 @@ DarkStudio is a free, open-source computer-vision toolchain. It lets you label, 
 | `tools/ov-bench/` | C++ tool: run Darknet ONNX models with OpenVINO (Intel GPU/CPU), benchmark and save annotated images | Apache-2.0 |
 | `tools/sycl-check/` | C++/SYCL tool: show the SYCL device and benchmark oneMKL SGEMM (Intel GPU training check) | Apache-2.0 |
 | `tools/sycl-migrate/` | Scripts to convert Darknet's CUDA kernels to SYCL with SYCLomatic (WSL), import them into the fork, build Darknet with SYCL (`build-darknet-sycl.bat`), and compare CPU vs SYCL results (`compare-cpu-sycl.ps1`) | Apache-2.0 |
+| `tools/train-test/` | Prepare a small dataset (LEGO Gears, local testing only, CC BY-NC-SA) for CPU vs Intel GPU training comparisons | Apache-2.0 |
 | `docs/` | [Windows build](docs/build-windows.md), [Intel GPU](docs/intel-gpu.md) | Apache-2.0 |
 | `server/` | C++ backend (Drogon). Planned | Apache-2.0 |
 | `web/` | React + TypeScript web UI. Planned | Apache-2.0 |
@@ -23,7 +24,7 @@ DarkStudio is a free, open-source computer-vision toolchain. It lets you label, 
 | Hardware | Inference | Training | Status |
 |---|---|---|---|
 | CPU (x64 / ARM) | Darknet (AVX2 + OpenMP), OpenVINO, ONNX Runtime | Darknet (AVX2 + OpenMP) | **Working on Windows**: yolov4-tiny ≈ 160–180 ms per image on an i5-1135G7 |
-| **Intel GPU** (Iris Xe, Arc) | **OpenVINO** (Darknet → ONNX), ONNX Runtime OpenVINO/DirectML EP | Darknet **SYCL / oneAPI** port | **Inference working**: yolov4-tiny at 11.8 ms / 85 FPS on Iris Xe (FP16), ~13× faster than CPU ([docs](docs/intel-gpu.md)) · **Native Darknet on Iris Xe via SYCL works** (darknet fork, branch `sycl`): identical detections to the CPU, 27.5 ms vs 180 ms per image · Training: next |
+| **Intel GPU** (Iris Xe, Arc) | **OpenVINO** (Darknet → ONNX), ONNX Runtime OpenVINO/DirectML EP | Darknet **SYCL / oneAPI** port | **Inference working**: yolov4-tiny at 11.8 ms / 85 FPS on Iris Xe (FP16), ~13× faster than CPU ([docs](docs/intel-gpu.md)) · **Native Darknet on Iris Xe via SYCL works** (darknet fork, branch `sycl`): inference identical to the CPU at 26 ms vs 180 ms per image, **training ~27× faster than CPU** (1.1 s vs 30 s per iteration) |
 | NVIDIA | Darknet CUDA/cuDNN, TensorRT | Darknet CUDA | Upstream |
 | AMD | Darknet ROCm, DirectML | Darknet ROCm | Upstream |
 | Apple | CoreML | CPU | Planned |
