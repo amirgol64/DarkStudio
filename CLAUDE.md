@@ -20,3 +20,4 @@ These rules apply to every session in this project.
 - Commit changes inside a submodule to that fork first, then commit the updated submodule pointer in DarkStudio.
 - Windows deps come from vcpkg at `C:\src\vcpkg` (triplet `x64-windows`). Build from a VS 2022 x64 Developer environment.
 - Follow [docs/build-windows.md](docs/build-windows.md): run CMake from inside `darknet/build`, use `-DDARKNET_TRY_OPENBLAS=OFF`, install to `build/install/`, and point DarkHelp at a **copy** of a `.cfg` in `models/pretrained/` (it rewrites cfg files).
+- OpenVINO 2026.4.1 lives at `C:\src\openvino` (see [docs/intel-gpu.md](docs/intel-gpu.md)). Always enable the model cache (`build/ov-cache`) and use the Iris Xe at FP16 by default.

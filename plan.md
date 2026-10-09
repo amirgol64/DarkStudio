@@ -49,6 +49,7 @@ DarkStudio is a free, open-source toolchain for computer vision. It brings label
 | 29 | Language | **C++ first** (C++20) for the engine, backend and tools. TypeScript only for the browser UI, with C++ compiled to WebAssembly for heavy client-side work. Python only for one-time model conversion |
 | 30 | Hosting | Everything on GitHub (`amirgol64/*`). Forks sync from Codeberg `CCodeRun/*` as `upstream` |
 | 31 | CPU math on Windows | **No OpenBLAS.** Darknet's built-in AVX2 + OpenMP GEMM measured ~20× faster than vcpkg's MSVC-built OpenBLAS. CPU baseline for yolov4-tiny: ~160–180 ms per image |
+| 32 | Intel GPU inference | **OpenVINO 2026.4.1** (C++ runtime, `C:\src\openvino`). Iris Xe at FP16 is the default device, with the model cache always on. yolov4-tiny runs at 11.8 ms (85 FPS) |
 
 ---
 
@@ -132,7 +133,9 @@ DarkStudio/  (C:\dev\Python_dev\draknet)
 ├── web/                # React frontend (Apache-2.0)
 │   └── src/{features/{label,datasets,train,zoo,review},components,i18n}
 ├── models/registry.yaml  # model metadata: task, license, URLs, pre/post-proc
-├── tools/              # converters, scripts
+├── models/pretrained/  # downloaded weights/cfg/onnx (git-ignored)
+├── tools/              # C++ CLI tools
+│   └── ov-bench/       # OpenVINO runner and benchmark for Darknet ONNX models (M0a)
 ├── docs/
 └── .github/workflows/
 ```
@@ -150,7 +153,7 @@ Upstream Darknet only accelerates on NVIDIA CUDA and AMD ROCm. On Intel hardware
 
 | Workload | Intel path | License | When |
 |---|---|---|---|
-| **Inference: Darknet models** | Darknet → ONNX (`src-onnx`) → **OpenVINO** (GPU plugin on Iris Xe, CPU plugin as fallback) | Apache-2.0 | M1 |
+| **Inference: Darknet models** | Darknet → ONNX (`src-onnx`) → **OpenVINO** (GPU plugin on Iris Xe, CPU plugin as fallback) | Apache-2.0 | ✅ **M0a**: 85 FPS on Iris Xe (FP16) |
 | **Inference: all other models** | DarkHelp `IBackend` → **ONNX Runtime + OpenVINO EP** (alternatively DirectML EP) | MIT / Apache-2.0 | M2 |
 | **Training: CPU** | Darknet CPU build with **AVX2 + OpenMP** (built-in GEMM, ~20× faster than vcpkg OpenBLAS on Windows), later oneDNN for conv/GEMM | Apache-2.0 | ✅ builds (M0) |
 | **Training: Intel GPU** | Port Darknet's CUDA kernels to **SYCL (oneAPI DPC++)**: use **SYCLomatic** for the first draft, then use oneMKL for GEMM and oneDNN for conv. Adds a `DARKNET_TRY_SYCL` CMake option alongside CUDA/ROCm | Apache-2.0 (w/ LLVM exception) | **M0b** (moved up, weeks 5–12) |
@@ -200,10 +203,11 @@ Milestones assume one developer working full time. Each one ends with a release 
 - [ ] Write `THIRD_PARTY_LICENSES.md`, `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
 
 ### M0a — Intel GPU inference with OpenVINO (week 4)
-- [ ] Install the OpenVINO C++ runtime (Apache-2.0) with the GPU plugin for Iris Xe. Document it in `docs/build-windows.md`.
-- [ ] Export yolov4-tiny to ONNX with `darknet_onnx_export`.
-- [ ] Small C++ benchmark tool: load ONNX in OpenVINO, run on `GPU` (FP16/FP32) and `CPU`, decode the boxes, and compare the detections with Darknet.
-- [ ] Benchmark against the Darknet CPU baseline (~160–180 ms per image). Record the results in the docs.
+- [x] Install the OpenVINO 2026.4.1 C++ runtime (Apache-2.0, prebuilt archive, SHA256 verified) at `C:\src\openvino`, including the GPU plugin for the Iris Xe. Documented in `docs/intel-gpu.md`.
+- [x] Export yolov4-tiny to ONNX with `darknet_onnx_export`. The output format (normalized x1,y1,x2,y2 boxes plus confs) was confirmed empirically and documented.
+- [x] `tools/ov-bench` (C++20): loads ONNX in OpenVINO, runs on GPU/CPU at FP16/FP32, decodes the boxes with per-class NMS, clips them, times each stage, and saves annotated images.
+- [x] Detections match Darknet on all 6 sample images (same objects, confidences within 1%).
+- [x] Benchmark: **Iris Xe FP16 11.8 ms (85 FPS, ~13× Darknet CPU)**, Iris Xe FP32 18.5 ms, OpenVINO CPU 80.5 ms. The model cache cuts the GPU compile from 12.6 s to 0.12 s. Results are in `docs/intel-gpu.md`.
 
 ### M0b — Darknet training on Intel GPU via SYCL (weeks 5–12, moved up from "M3b")
 Moved up on 2026-10-09: the dev PC has only an Iris Xe, so GPU training on it speeds up all later work. Expect ~3–5× faster than CPU for tiny models.
@@ -315,7 +319,7 @@ This is the biggest research item. Code lives in `darknet/src-lib/`.
 
 1. ~~Create the forks and set the remotes.~~ Done.
 2. ~~Build Darknet and DarkHelp on this Windows machine and record the steps in `docs/build-windows.md`.~~ Done. CPU baseline is ~160–180 ms per image.
-3. **M0a:** install OpenVINO and run the first Intel GPU inference (Darknet → ONNX → OpenVINO). *In progress.*
+3. ~~**M0a:** install OpenVINO and run the first Intel GPU inference.~~ Done: 85 FPS on Iris Xe, ~13× the Darknet CPU.
 4. **M0b:** install oneAPI and start the SYCL port of Darknet for Iris Xe training.
 5. Scaffold `server/` (Drogon hello-world plus SQLite) and `web/` (Vite + React + TS + Konva).
 6. Set up CI with the build matrix and the license gate.
