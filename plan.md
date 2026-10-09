@@ -138,6 +138,7 @@ DarkStudio/  (C:\dev\Python_dev\draknet)
 ├── tools/              # C++ CLI tools
 │   ├── ov-bench/       # OpenVINO runner and benchmark for Darknet ONNX models (M0a)
 │   ├── sycl-check/     # SYCL device info + oneMKL SGEMM benchmark (M0b)
+│   ├── train-test/     # dataset prep for CPU vs Intel GPU training comparisons (M0b)
 │   └── sycl-migrate/   # SYCLomatic setup and migration scripts, run in WSL (M0b)
 ├── docs/
 └── .github/workflows/
@@ -159,7 +160,7 @@ Upstream Darknet only accelerates on NVIDIA CUDA and AMD ROCm. On Intel hardware
 | **Inference: Darknet models** | Darknet → ONNX (`src-onnx`) → **OpenVINO** (GPU plugin on Iris Xe, CPU plugin as fallback) | Apache-2.0 | ✅ **M0a**: 85 FPS on Iris Xe (FP16) |
 | **Inference: all other models** | DarkHelp `IBackend` → **ONNX Runtime + OpenVINO EP** (alternatively DirectML EP) | MIT / Apache-2.0 | M2 |
 | **Training: CPU** | Darknet CPU build with **AVX2 + OpenMP** (built-in GEMM, ~20× faster than vcpkg OpenBLAS on Windows), later oneDNN for conv/GEMM | Apache-2.0 | ✅ builds (M0) |
-| **Training: Intel GPU** | Port Darknet's CUDA kernels to **SYCL (oneAPI DPC++)**: use **SYCLomatic** for the first draft, then use oneMKL for GEMM and oneDNN for conv. Adds a `DARKNET_TRY_SYCL` CMake option alongside CUDA/ROCm | Apache-2.0 (w/ LLVM exception) | **M0b**: inference ✅ (identical to CPU, 6.5× faster), training 🔨 |
+| **Training: Intel GPU** | Port Darknet's CUDA kernels to **SYCL (oneAPI DPC++)**: use **SYCLomatic** for the first draft, then use oneMKL for GEMM and oneDNN for conv. Adds a `DARKNET_TRY_SYCL` CMake option alongside CUDA/ROCm | Apache-2.0 (w/ LLVM exception) | **M0b**: inference ✅ (identical to CPU, 6.5× faster), training ✅ (~27× faster than CPU) |
 
 What to expect on Iris Xe (~2 TFLOPS FP32, shared memory): inference on yolov4-tiny-class models should be real-time through OpenVINO FP16. Training on the iGPU will be several times faster than CPU but far slower than a discrete NVIDIA GPU, so for small datasets and tiny models it's practical. Big training runs will still want a CUDA/ROCm machine or the multi-user GPU server (M5).
 
@@ -226,13 +227,25 @@ Moved up on 2026-10-09: the dev PC has only an Iris Xe, so GPU training on it sp
 - [x] Port the host side with a **CUDA-on-SYCL compatibility layer** (`darknet_sycl.hpp/.cpp`, ~40 functions). `dark_cuda.cpp` and all layers compile **unchanged**. Covers USM memory, in-order queues as streams, cuBLAS → oneMKL GEMM, cuRAND → oneMKL RNG, and exceptions → `cudaError_t`.
 - [x] Upstream build fixes found along the way: SYCL headers must come before Darknet's global `node`/`list` types; `gemm.cpp` `__m256` indexing for clang; a `getopt.h` forward declaration; and the ONNX tool now respects `DARKNET_TRY_ONNX`.
 - [x] Inference on the Iris Xe via SYCL gives **identical detections to the CPU** on all 6 sample images (0 class mismatches, 0.0000 probability difference, 0 px box difference) at **27.5 ms vs 180 ms per image (6.5×)**. Checked with `tools/sycl-migrate/compare-cpu-sycl.ps1`.
-- [ ] Make kernel literals single precision (`-Wdouble-promotion` audit, `0.5` → `0.5f`). This is required for training kernels on GPUs without FP64, and it also speeds up CUDA.
-- [ ] AOT-compile for Iris Xe (`-DDARKNET_SYCL_TARGETS=intel_gpu_tgllp`) to remove the first-run JIT delay. Measure startup.
+- [x] Make kernel literals single precision: the `-Wdouble-promotion` audit found **23 kernel sites**, all now `float` literals. Inference is still identical to the CPU.
+- [x] AOT for Iris Xe: **not possible with oneAPI 2026** (`ocloc` dropped `tgllp`). Not needed either: the driver's kernel cache gives a 0.7 s process start after the one-time ~1.7 s JIT. AOT is documented for Arc (`intel_gpu_acm_g10`).
+- [x] Training smoke test (LEGO Gears, 20 iterations, batch 64): **Iris Xe 1.1 s/iteration vs CPU 30 s/iteration (~27×)**, with no errors, NaNs or FP64 issues. `tools/train-test/prepare-legogears.ps1` prepares the data.
 - [ ] Build DarkHelp against the SYCL Darknet, so DarkHelp/DarkStudio can use the Iris Xe directly.
 - [ ] Later: cuDNN-style conv with oneDNN, and FP16 (the Iris Xe supports fp16).
-- [ ] Training check: train yolov4-tiny on a small dataset on CPU and on SYCL. The loss curve and mAP should match.
-- [ ] Benchmark training (iterations per second) on the Iris Xe against the CPU. Document it in `docs/`.
+- [x] Training check: LEGO Gears (yolov4-tiny-style network), **1,000 iterations on Iris Xe in 19.6 min**, final loss 0.09, **mAP@0.50 100% / mAP@0.75 84.6%**, checked on the CPU build (the author's 3,000-iteration weights: 100%/100%). CPU and GPU loss curves match over the 20-iteration smoke test. GPU-trained weights work on the CPU build.
+- [x] Benchmark training on the Iris Xe against the CPU: **1.1 s vs 30 s per iteration (batch 64, 224×160), ~27×**. Documented in `docs/intel-gpu.md`.
 - [ ] Offer it upstream to Hank.ai Darknet.
+
+### M0c — DarkStudio UI v0: see functionality, performance and errors (after the first Iris Xe training run)
+Decided 2026-10-09: build the first slice of the **real** app (Drogon C++ server + React/TypeScript UI) instead of a throwaway dashboard, so it becomes the M1 foundation. It starts once the M0b training test works, so there's real training to show.
+- [ ] `server/`: Drogon skeleton, REST + WebSocket, job runner that launches Darknet / ov-bench / compare tools and streams their output.
+- [ ] `web/`: Vite + React + TS app shell, theme, i18n (EN + HE/RTL), navigation.
+- [ ] **Devices & backends** view: CPU / Iris Xe / OpenVINO / SYCL status, versions, memory, and detection errors.
+- [ ] **Benchmarks** view: run ov-bench and CPU-vs-SYCL comparisons from the UI. Charts of ms/FPS per backend and accuracy differences.
+- [ ] **Live training** view: start/stop/resume, live loss and mAP chart, iterations/sec, GPU memory, checkpoints.
+- [ ] **Logs & errors** view: live log stream with SYCL/JIT/compat errors highlighted and filterable.
+- [ ] **Annotation** view (first version of the M1 labeling canvas): boxes and polygons on a dataset folder.
+- [ ] **Settings** view: paths (oneAPI, OpenVINO, vcpkg, models), default device and precision, the model cache.
 
 ### M1 — MVP: label → train → infer (weeks 13–21)
 **Backend**
@@ -333,7 +346,7 @@ This is the biggest research item. Code lives in `darknet/src-lib/`.
 1. ~~Create the forks and set the remotes.~~ Done.
 2. ~~Build Darknet and DarkHelp on this Windows machine and record the steps in `docs/build-windows.md`.~~ Done. CPU baseline is ~160–180 ms per image.
 3. ~~**M0a:** install OpenVINO and run the first Intel GPU inference.~~ Done: 85 FPS on Iris Xe, ~13× the Darknet CPU.
-4. **M0b:** SYCL port of Darknet for Iris Xe training. *In progress:* **inference runs on the Iris Xe with identical results to the CPU, 6.5× faster.** Next: single-precision literals, then the training check (CPU vs SYCL loss curve).
-5. Scaffold `server/` (Drogon hello-world plus SQLite) and `web/` (Vite + React + TS + Konva).
+4. **M0b:** SYCL port of Darknet. **Inference on the Iris Xe is identical to the CPU (6.5× faster) and training works (~27× faster than CPU, mAP@0.50 100% on LEGO Gears).** Left: the DPCT1118 review, DarkHelp on SYCL, the training benchmark row, and the upstream offer.
+5. **M0c:** DarkStudio UI v0 (devices, benchmarks, live training, logs/errors, annotation, settings) right after the first Iris Xe training run. This scaffolds `server/` (Drogon) and `web/` (Vite + React + TS).
 6. Set up CI with the build matrix and the license gate.
-7. Start the M1 labeling canvas.
+7. Continue the M1 labeling canvas from the M0c annotation view.

@@ -5,7 +5,7 @@ Upstream Darknet only accelerates on NVIDIA (CUDA) and AMD (ROCm). DarkStudio ad
 | Step | What | Status |
 |---|---|---|
 | **M0a: inference** | Darknet `.weights` → ONNX → **OpenVINO** on the Intel GPU | ✅ Working (2026-10-09) |
-| **M0b: native Darknet on Intel GPU** | Darknet's CUDA kernels ported to **SYCL / oneAPI** (darknet fork, branch `sycl`) | ✅ **Inference works**: identical to CPU, 6.5× faster · 🔨 Training next |
+| **M0b: native Darknet on Intel GPU** | Darknet's CUDA kernels ported to **SYCL / oneAPI** (darknet fork, branch `sycl`) | ✅ **Inference**: identical to CPU, 6.5× faster · ✅ **Training runs**: ~27× faster than CPU |
 
 See `plan.md` §3.3 for the full strategy.
 
@@ -111,7 +111,7 @@ OpenVINO can only run models. To train on the Iris Xe, Darknet's CUDA code is po
 | Sub-group sizes | 8, 16, 32 | Warp-level code (`__shfl`) maps to sub-groups of 32 |
 | Local memory | 64 KiB | |
 | Global memory | ~14.5 GiB (shared with the system) | |
-| FP16 / FP64 | yes / **no** | No kernel declares a `double`, but some use double *literals* (`.001*x`), which promote to FP64. The inference kernels run fine. The literals are being changed to `float` (`0.001f`) before training |
+| FP16 / FP64 | yes / **no** | No kernel declares a `double`, but 23 places used double *literals* (`.001*x`, `val*0.1`, `angle * 3.14159265`), which promote to FP64. All were found with `-Wdouble-promotion` and changed to `float` literals |
 
 oneMKL SGEMM replaces cuBLAS. Convolutions in Darknet's GPU path are im2col + SGEMM, so this is the main cost of training:
 
@@ -183,7 +183,37 @@ yolov4-tiny 416×416, `darknet_06_images_to_json`, 6 sample images × 3 passes (
 | **Darknet SYCL on Iris Xe** | **27.5 ms (6.5×)** | **identical**: 16/16 detections, probability difference 0.0000, box difference 0 px |
 | (OpenVINO on Iris Xe, FP16, for comparison) | 11.8 ms | within 1% |
 
-The first image takes ~280 ms because the SYCL kernels are JIT-compiled at the first launch. AOT compilation removes that (next step). OpenVINO stays faster for pure inference (it fuses layers and uses FP16), but the native SYCL build is what makes **training** on the Iris Xe possible.
+OpenVINO stays faster for pure inference (it fuses layers and uses FP16), but the native SYCL build is what makes **training** on the Iris Xe possible.
+
+### Startup: JIT vs AOT
+
+- The kernels are JIT-compiled by the GPU driver at the first launch. After a rebuild, the first image takes **~1.7 s** once. After that the **Intel driver's own kernel cache** brings it to ~250 ms, and the whole `darknet_06_images_to_json` process runs in **~0.7 s**. SYCL's persistent cache (`SYCL_CACHE_PERSISTENT=1`) made no measurable difference on top of the driver cache.
+- **AOT isn't available for the 11th-gen Iris Xe with oneAPI 2026**: its `ocloc` no longer supports `tgllp` (Gen12LP went to Intel's legacy driver line), so `-DDARKNET_SYCL_TARGETS=intel_gpu_tgllp` fails with `Cannot get HW Info for device tgllp`. JIT is fine here.
+- For **Arc and newer** GPUs, AOT works, e.g. `set DARKNET_SYCL_CMAKE_ARGS=-DDARKNET_SYCL_TARGETS=intel_gpu_acm_g10` before `build-darknet-sycl.bat`.
+
+### Training on the Iris Xe
+
+Dataset: [LEGO Gears v2](https://www.ccoderun.ca/programming/2024-05-01_LegoGears/) by Stéphane Charette (90 images, 5 classes, 224×160, yolov4-tiny-style network). It's **CC BY-NC-SA**, so we use it for local testing only and never redistribute it. `tools/train-test/prepare-legogears.ps1` downloads it into `datasets/` (git-ignored) and writes a deterministic train/valid split (81/9) plus a training cfg.
+
+Smoke test, 20 iterations, batch 64, same cfg and lists:
+
+| Build | Per iteration | 20 iterations | Last loss (avg) |
+|---|---|---|---|
+| Darknet CPU (AVX2 + OpenMP) | ~30 s | 578 s | 1.55 (18.2) |
+| **Darknet SYCL on Iris Xe** | **~1.1 s** | **25 s** | 1.33 (15.2) |
+
+So **training on the Iris Xe is ~27× faster than Darknet on the CPU**. The gap is bigger than for inference because Darknet's CPU backward pass is slow while the GPU path uses oneMKL. Training uses random augmentation, so CPU and GPU losses aren't bit-identical, but they follow the same curve.
+
+Full run: **1,000 iterations on the Iris Xe in 19.6 minutes** (1.1–1.2 s/iteration with mAP checks), final loss **0.09**. Evaluated on the **CPU build** as an independent check (9 validation images):
+
+| Weights | mAP@0.50 | mAP@0.75 |
+|---|---|---|
+| Author's published `LegoGears_best.weights` (3,000 iterations, probably trained on all 90 images, including our validation images) | 100% | 100% |
+| **Ours: trained on the Iris Xe, 1,000 iterations, 81 training images** | **100%** | **84.6%** |
+
+Weights trained on the Iris Xe are ordinary Darknet weights and work unchanged on the CPU build. A 3,000-iteration run (~1 hour on the Iris Xe; ~25 hours on the CPU) would match the author's schedule.
+
+> Darknet asks for confirmation (`Type "yes"`) before training on a CPU. For scripted runs, pipe it in: `cmd /c "echo yes| darknet detector train ..."`. The SYCL build doesn't ask, because it's a GPU build.
 
 ### Toolchain setup
 
