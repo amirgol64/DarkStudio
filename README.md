@@ -14,6 +14,20 @@ DarkStudio is a free, open-source computer-vision toolchain. It lets you label, 
 | `server/` | C++ backend (Drogon). Planned | Apache-2.0 |
 | `web/` | React + TypeScript web UI. Planned | Apache-2.0 |
 
+## Hardware support
+
+| Hardware | Inference | Training | Status |
+|---|---|---|---|
+| CPU (x64 / ARM) | Darknet, OpenVINO, ONNX Runtime | Darknet + OpenMP/OpenBLAS | Planned (M0/M1) |
+| **Intel GPU** (Iris Xe, Arc) | **OpenVINO** (Darknet → ONNX), ONNX Runtime OpenVINO/DirectML EP | Darknet **SYCL / oneAPI** port | Inference: M1/M2 · Training: research (M3b) |
+| NVIDIA | Darknet CUDA/cuDNN, TensorRT | Darknet CUDA | Upstream |
+| AMD | Darknet ROCm, DirectML | Darknet ROCm | Upstream |
+| Apple | CoreML | CPU | Planned |
+
+## Languages
+
+DarkStudio is **C++ first**. The engine, server and tools are C++20. The browser UI is TypeScript, with heavy work in C++ compiled to WebAssembly. Python is only used for one-time model conversion to ONNX. See [plan.md §3.4](plan.md#34-c-first).
+
 ## Getting the code
 
 ```sh
@@ -46,6 +60,14 @@ git -C darknet  remote add upstream https://codeberg.org/CCodeRun/darknet.git
 git -C DarkHelp remote add upstream https://codeberg.org/CCodeRun/DarkHelp.git
 git -C DarkMark remote add upstream https://codeberg.org/CCodeRun/DarkMark.git
 ```
+
+## Building
+
+- Windows: `docs/build-windows.md` (in progress). Dependencies come from vcpkg at `C:\src\vcpkg`.
+
+## Contributing
+
+Read [CLAUDE.md](CLAUDE.md) for the project rules. Every change has to tick its task in `plan.md` and update `README.md` and `docs/` when it adds a feature, platform or dependency.
 
 ## License
 
