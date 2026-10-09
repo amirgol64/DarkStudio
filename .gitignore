@@ -21,6 +21,7 @@ __pycache__/
 *.onnx
 *.engine
 datasets/
+models/pretrained/
 
 # local data
 *.db

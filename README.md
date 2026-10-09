@@ -18,7 +18,7 @@ DarkStudio is a free, open-source computer-vision toolchain. It lets you label, 
 
 | Hardware | Inference | Training | Status |
 |---|---|---|---|
-| CPU (x64 / ARM) | Darknet, OpenVINO, ONNX Runtime | Darknet + OpenMP/OpenBLAS | Planned (M0/M1) |
+| CPU (x64 / ARM) | Darknet (AVX2 + OpenMP), OpenVINO, ONNX Runtime | Darknet (AVX2 + OpenMP) | **Working on Windows**: yolov4-tiny ≈ 160–180 ms per image on an i5-1135G7 |
 | **Intel GPU** (Iris Xe, Arc) | **OpenVINO** (Darknet → ONNX), ONNX Runtime OpenVINO/DirectML EP | Darknet **SYCL / oneAPI** port | Inference: M1/M2 · Training: research (M3b) |
 | NVIDIA | Darknet CUDA/cuDNN, TensorRT | Darknet CUDA | Upstream |
 | AMD | Darknet ROCm, DirectML | Darknet ROCm | Upstream |
@@ -63,7 +63,11 @@ git -C DarkMark remote add upstream https://codeberg.org/CCodeRun/DarkMark.git
 
 ## Building
 
-- Windows: `docs/build-windows.md` (in progress). Dependencies come from vcpkg at `C:\src\vcpkg`.
+- **Windows:** [docs/build-windows.md](docs/build-windows.md) covers vcpkg, Darknet (CPU), DarkHelp, a smoke test and performance notes. Dependencies come from vcpkg at `C:\src\vcpkg`, and the build installs to `build/install/`.
+  - Configure Darknet with `-DDARKNET_TRY_OPENBLAS=OFF` on Windows. vcpkg's OpenBLAS is about 20× slower than Darknet's built-in AVX2 code.
+- Our forks carry these Windows build fixes (to be offered upstream):
+  - **darknet:** the ONNX protobuf header is generated before the library compiles (fixes parallel build error C1083).
+  - **DarkHelp:** runtime DLLs install without copying `darknet.dll` by hand.
 
 ## Contributing
 

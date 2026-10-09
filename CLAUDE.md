@@ -19,3 +19,4 @@ These rules apply to every session in this project.
 - `darknet/`, `DarkHelp/`, `DarkMark/` are submodules. `origin` is github.com/amirgol64/<repo> and `upstream` is codeberg.org/CCodeRun/<repo> (fetch only).
 - Commit changes inside a submodule to that fork first, then commit the updated submodule pointer in DarkStudio.
 - Windows deps come from vcpkg at `C:\src\vcpkg` (triplet `x64-windows`). Build from a VS 2022 x64 Developer environment.
+- Follow [docs/build-windows.md](docs/build-windows.md): run CMake from inside `darknet/build`, use `-DDARKNET_TRY_OPENBLAS=OFF`, install to `build/install/`, and point DarkHelp at a **copy** of a `.cfg` in `models/pretrained/` (it rewrites cfg files).

@@ -48,6 +48,7 @@ DarkStudio is a free, open-source toolchain for computer vision. It brings label
 | 28 | Dev hardware | Windows 11, **Intel Iris Xe iGPU** (i5-1135G7, 32 GB), **no CUDA**. Intel GPU support is a priority (see §3.3) |
 | 29 | Language | **C++ first** (C++20) for the engine, backend and tools. TypeScript only for the browser UI, with C++ compiled to WebAssembly for heavy client-side work. Python only for one-time model conversion |
 | 30 | Hosting | Everything on GitHub (`amirgol64/*`). Forks sync from Codeberg `CCodeRun/*` as `upstream` |
+| 31 | CPU math on Windows | **No OpenBLAS.** Darknet's built-in AVX2 + OpenMP GEMM measured ~20× faster than vcpkg's MSVC-built OpenBLAS. CPU baseline for yolov4-tiny: ~160–180 ms per image |
 
 ---
 
@@ -151,7 +152,7 @@ Upstream Darknet only accelerates on NVIDIA CUDA and AMD ROCm. On Intel hardware
 |---|---|---|---|
 | **Inference: Darknet models** | Darknet → ONNX (`src-onnx`) → **OpenVINO** (GPU plugin on Iris Xe, CPU plugin as fallback) | Apache-2.0 | M1 |
 | **Inference: all other models** | DarkHelp `IBackend` → **ONNX Runtime + OpenVINO EP** (alternatively DirectML EP) | MIT / Apache-2.0 | M2 |
-| **Training: CPU** | Darknet CPU build with **OpenMP + OpenBLAS**, later oneDNN for conv/GEMM | BSD / Apache-2.0 | M1 |
+| **Training: CPU** | Darknet CPU build with **AVX2 + OpenMP** (built-in GEMM, ~20× faster than vcpkg OpenBLAS on Windows), later oneDNN for conv/GEMM | Apache-2.0 | ✅ builds (M0) |
 | **Training: Intel GPU** | Port Darknet's CUDA kernels to **SYCL (oneAPI DPC++)**: use **SYCLomatic** for the first draft, then use oneMKL for GEMM and oneDNN for conv. Adds a `DARKNET_TRY_SYCL` CMake option alongside CUDA/ROCm | Apache-2.0 (w/ LLVM exception) | M3b (research) |
 
 What to expect on Iris Xe (~2 TFLOPS FP32, shared memory): inference on yolov4-tiny-class models should be real-time through OpenVINO FP16. Training on the iGPU will be several times faster than CPU but far slower than a discrete NVIDIA GPU, so for small datasets and tiny models it's practical. Big training runs will still want a CUDA/ROCm machine or the multi-user GPU server (M5).
@@ -181,11 +182,17 @@ Milestones assume one developer working full time. Each one ends with a release 
 - [x] Write `README.md` with the layout, cloning steps and the upstream-sync procedure.
 - [x] Write `CLAUDE.md` with project rules (docs-sync, C++ first, license gate, Intel hardware).
 - [x] Install vcpkg at `C:\src\vcpkg`.
-- [ ] Use vcpkg to build OpenCV, OpenBLAS, protobuf and TCLAP (x64-windows).
-- [ ] Build Darknet on Windows, CPU-only with OpenMP and OpenBLAS (no CUDA on the dev PC).
-- [ ] Build DarkHelp on Windows against Darknet.
-- [ ] Smoke test: run a pretrained yolov4-tiny on a sample image (CPU).
-- [ ] Write `docs/build-windows.md` with the exact steps.
+- [x] Use vcpkg to build OpenCV 4.14 (with DirectML), protobuf, TCLAP and OpenBLAS (x64-windows). We recovered from a corrupted `utf8-range` header left by an interrupted build.
+- [x] Build Darknet on Windows, CPU-only with AVX2 + OpenMP + ONNX export (no CUDA on the dev PC).
+- [x] Fix in the darknet fork: generate the ONNX protobuf header before `darknetobjlib` compiles (parallel-build race, C1083).
+- [x] Build DarkHelp on Windows against Darknet, installed to `build/install`.
+- [x] Fix in the DarkHelp fork: install runtime DLLs on Windows without copying `darknet.dll` by hand.
+- [x] Smoke test: pretrained yolov4-tiny on the Darknet sample images (CPU). The detections are correct.
+- [x] Benchmark CPU: vcpkg OpenBLAS was ~2,600 ms per image against **~130–180 ms** with Darknet's built-in AVX2 GEMM. **Decided:** build with `-DDARKNET_TRY_OPENBLAS=OFF` on Windows.
+- [x] Write `docs/build-windows.md` with the exact steps, pitfalls and performance notes.
+- [ ] Offer both build fixes upstream (Codeberg PRs), and report the OpenBLAS slowdown to the Darknet docs.
+- [ ] Upstream fix: make `CM_version.cmake` run `git describe` in `${CMAKE_CURRENT_SOURCE_DIR}` (today it fails unless CMake is started from inside `darknet/build`).
+- [ ] Remove OpenBLAS from vcpkg on the dev PC (it's unused now) and drop it from the docs' dependency list in CI.
 - [ ] Linux build steps (`docs/build-linux.md`).
 - [ ] Create the rest of the monorepo skeleton (`server/`, `web/`, CMake superbuild, vcpkg manifest).
 - [ ] CI: build matrix (Windows, Ubuntu, macOS), license scanner, clang-format/clang-tidy, ESLint/Prettier.
@@ -298,7 +305,7 @@ This is the biggest research item. Code lives in `darknet/src-lib/`.
 ## 7. Immediate next steps
 
 1. ~~Create the forks and set the remotes.~~ Done.
-2. Build Darknet and DarkHelp on this Windows machine (CPU, OpenMP, OpenBLAS) and record the steps in `docs/build-windows.md`.
+2. ~~Build Darknet and DarkHelp on this Windows machine and record the steps in `docs/build-windows.md`.~~ Done. CPU baseline is ~160–180 ms per image.
 3. Install OpenVINO and run the first Intel GPU inference (Darknet → ONNX → OpenVINO).
 4. Scaffold `server/` (Drogon hello-world plus SQLite) and `web/` (Vite + React + TS + Konva).
 5. Set up CI with the build matrix and the license gate.
