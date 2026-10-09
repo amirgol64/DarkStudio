@@ -1,0 +1,19 @@
+# DarkStudio - ov-bench: run Darknet ONNX models with OpenVINO and measure speed.
+# SPDX-License-Identifier: Apache-2.0
+
+CMAKE_MINIMUM_REQUIRED (VERSION 3.24)
+PROJECT (ov-bench LANGUAGES CXX)
+
+SET (CMAKE_CXX_STANDARD 20)
+SET (CMAKE_CXX_STANDARD_REQUIRED ON)
+
+FIND_PACKAGE (OpenVINO REQUIRED COMPONENTS Runtime)
+FIND_PACKAGE (OpenCV CONFIG REQUIRED)
+
+ADD_EXECUTABLE (ov-bench ov_bench.cpp)
+TARGET_LINK_LIBRARIES (ov-bench PRIVATE openvino::runtime ${OpenCV_LIBS})
+IF (MSVC)
+	TARGET_COMPILE_OPTIONS (ov-bench PRIVATE /W4 /utf-8)
+ENDIF ()
+
+INSTALL (TARGETS ov-bench RUNTIME DESTINATION bin)

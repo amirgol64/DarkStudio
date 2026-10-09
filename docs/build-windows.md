@@ -98,4 +98,4 @@ Detections are identical. Always configure with `-DDARKNET_TRY_OPENBLAS=OFF` on 
 
 ### Baseline for Intel GPU work
 
-The CPU baseline is **~160–180 ms per image** (≈6 FPS) for yolov4-tiny, measured with DarkHelp including annotation. The OpenVINO / Iris Xe path (plan.md M1) is measured against this number.
+The CPU baseline is **~160–180 ms per image** (≈6 FPS) for yolov4-tiny, measured with DarkHelp including annotation. The same model on the Iris Xe through OpenVINO runs at **11.8 ms (85 FPS)**. See [intel-gpu.md](intel-gpu.md).
