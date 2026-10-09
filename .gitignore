@@ -1,0 +1,27 @@
+# build output
+build/
+out/
+dist/
+
+# web
+node_modules/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+.venv/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# large model / data files
+*.weights
+*.onnx
+*.engine
+datasets/
+
+# local data
+*.db
+.env

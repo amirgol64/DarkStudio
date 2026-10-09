@@ -1,0 +1,12 @@
+[submodule "darknet"]
+	path = darknet
+	url = https://github.com/amirgol64/darknet.git
+	branch = master
+[submodule "DarkHelp"]
+	path = DarkHelp
+	url = https://github.com/amirgol64/DarkHelp.git
+	branch = master
+[submodule "DarkMark"]
+	path = DarkMark
+	url = https://github.com/amirgol64/DarkMark.git
+	branch = master
