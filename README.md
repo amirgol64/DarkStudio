@@ -19,7 +19,7 @@ DarkStudio is a free, open-source computer-vision toolchain. It lets you label, 
 | Hardware | Inference | Training | Status |
 |---|---|---|---|
 | CPU (x64 / ARM) | Darknet (AVX2 + OpenMP), OpenVINO, ONNX Runtime | Darknet (AVX2 + OpenMP) | **Working on Windows**: yolov4-tiny ≈ 160–180 ms per image on an i5-1135G7 |
-| **Intel GPU** (Iris Xe, Arc) | **OpenVINO** (Darknet → ONNX), ONNX Runtime OpenVINO/DirectML EP | Darknet **SYCL / oneAPI** port | Inference: M1/M2 · Training: research (M3b) |
+| **Intel GPU** (Iris Xe, Arc) | **OpenVINO** (Darknet → ONNX), ONNX Runtime OpenVINO/DirectML EP | Darknet **SYCL / oneAPI** port | Inference: M0a (OpenVINO, in progress) · Training: M0b (SYCL port, next) |
 | NVIDIA | Darknet CUDA/cuDNN, TensorRT | Darknet CUDA | Upstream |
 | AMD | Darknet ROCm, DirectML | Darknet ROCm | Upstream |
 | Apple | CoreML | CPU | Planned |

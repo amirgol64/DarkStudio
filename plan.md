@@ -2,7 +2,7 @@
 
 DarkStudio is a free, open-source toolchain for computer vision. It brings labeling, training, inference and export together in one web app, built on Hank.ai **Darknet**, **DarkHelp**, and ideas from **DarkMark**.
 
-- **Owner:** solo developer, full-time (roughly a 6–12 month roadmap)
+- **Owner:** solo developer, full-time (roughly a 14-month roadmap after moving Intel GPU work up to M0a/M0b)
 - **Workspace:** `C:\dev\Python_dev\draknet`
 - **Upstream clones** (each is a fork that we rebase regularly):
 
@@ -153,7 +153,7 @@ Upstream Darknet only accelerates on NVIDIA CUDA and AMD ROCm. On Intel hardware
 | **Inference: Darknet models** | Darknet → ONNX (`src-onnx`) → **OpenVINO** (GPU plugin on Iris Xe, CPU plugin as fallback) | Apache-2.0 | M1 |
 | **Inference: all other models** | DarkHelp `IBackend` → **ONNX Runtime + OpenVINO EP** (alternatively DirectML EP) | MIT / Apache-2.0 | M2 |
 | **Training: CPU** | Darknet CPU build with **AVX2 + OpenMP** (built-in GEMM, ~20× faster than vcpkg OpenBLAS on Windows), later oneDNN for conv/GEMM | Apache-2.0 | ✅ builds (M0) |
-| **Training: Intel GPU** | Port Darknet's CUDA kernels to **SYCL (oneAPI DPC++)**: use **SYCLomatic** for the first draft, then use oneMKL for GEMM and oneDNN for conv. Adds a `DARKNET_TRY_SYCL` CMake option alongside CUDA/ROCm | Apache-2.0 (w/ LLVM exception) | M3b (research) |
+| **Training: Intel GPU** | Port Darknet's CUDA kernels to **SYCL (oneAPI DPC++)**: use **SYCLomatic** for the first draft, then use oneMKL for GEMM and oneDNN for conv. Adds a `DARKNET_TRY_SYCL` CMake option alongside CUDA/ROCm | Apache-2.0 (w/ LLVM exception) | **M0b** (moved up, weeks 5–12) |
 
 What to expect on Iris Xe (~2 TFLOPS FP32, shared memory): inference on yolov4-tiny-class models should be real-time through OpenVINO FP16. Training on the iGPU will be several times faster than CPU but far slower than a discrete NVIDIA GPU, so for small datasets and tiny models it's practical. Big training runs will still want a CUDA/ROCm machine or the multi-user GPU server (M5).
 
@@ -199,7 +199,25 @@ Milestones assume one developer working full time. Each one ends with a release 
 - [x] Add `LICENSE` (Apache-2.0).
 - [ ] Write `THIRD_PARTY_LICENSES.md`, `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
 
-### M1 — MVP: label → train → infer (weeks 4–12)
+### M0a — Intel GPU inference with OpenVINO (week 4)
+- [ ] Install the OpenVINO C++ runtime (Apache-2.0) with the GPU plugin for Iris Xe. Document it in `docs/build-windows.md`.
+- [ ] Export yolov4-tiny to ONNX with `darknet_onnx_export`.
+- [ ] Small C++ benchmark tool: load ONNX in OpenVINO, run on `GPU` (FP16/FP32) and `CPU`, decode the boxes, and compare the detections with Darknet.
+- [ ] Benchmark against the Darknet CPU baseline (~160–180 ms per image). Record the results in the docs.
+
+### M0b — Darknet training on Intel GPU via SYCL (weeks 5–12, moved up from "M3b")
+Moved up on 2026-10-09: the dev PC has only an Iris Xe, so GPU training on it speeds up all later work. Expect ~3–5× faster than CPU for tiny models.
+- [ ] Install the Intel oneAPI Base Toolkit (DPC++ compiler, oneMKL, oneDNN, SYCLomatic). Check that `sycl-ls` sees the Iris Xe through Level Zero.
+- [ ] Audit Darknet's GPU code for FP64 use. Iris Xe (Gen12LP) has no native FP64, so keep the kernels in FP32/FP16.
+- [ ] Run SYCLomatic on `darknet/src-lib/*.cu` and review the generated SYCL code.
+- [ ] Add a `DARKNET_TRY_SYCL` CMake option and a `DARKNET_GPU_SYCL` code path next to CUDA/ROCm.
+- [ ] Replace cuBLAS GEMM with oneMKL, and cuDNN conv with oneDNN (or keep im2col + GEMM first).
+- [ ] Inference on the Iris Xe via SYCL gives the same detections as the CPU on the sample images.
+- [ ] Training check: train yolov4-tiny on a small dataset on CPU and on SYCL. The loss curve and mAP should match.
+- [ ] Benchmark training (iterations per second) on the Iris Xe against the CPU. Document it in `docs/`.
+- [ ] Offer it upstream to Hank.ai Darknet.
+
+### M1 — MVP: label → train → infer (weeks 13–21)
 **Backend**
 - [ ] Drogon server with SQLite. Migrations for users, projects, images, classes, annotations and jobs.
 - [ ] Local JWT auth (a single admin account in local mode).
@@ -207,7 +225,7 @@ Milestones assume one developer working full time. Each one ends with a release 
 - [ ] Import and export Darknet/YOLO txt, YOLO-seg polygons and COCO JSON.
 - [ ] Training job: generate `.cfg`, `.data` and `train.txt` (port DarkMark's ideas, not its code). Spawn Darknet, parse the log, stream loss/mAP over WebSocket, support stop and resume.
 - [ ] Inference job through DarkHelp with the Darknet backend. Results can be saved as pre-annotations.
-- [ ] **Intel GPU inference:** export the Darknet model to ONNX, run it through OpenVINO on the Iris Xe GPU (FP16), and fall back to the CPU. Benchmark against Darknet CPU.
+- [ ] Device picker for training and inference jobs: CPU, Intel GPU (SYCL / OpenVINO from M0a/M0b), and CUDA/ROCm when present.
 
 **Frontend**
 - [ ] App shell with routing, dark/light theme, i18n scaffold (EN plus HE with RTL), and keyboard shortcuts.
@@ -218,7 +236,7 @@ Milestones assume one developer working full time. Each one ends with a release 
 
 **Exit criterion:** label 200 images in the browser, train a YOLOv4-tiny, and view predictions, all without touching the CLI.
 
-### M2 — Multi-model inference via ONNX Runtime (weeks 13–18)
+### M2 — Multi-model inference via ONNX Runtime (weeks 22–27)
 - [ ] Add `IBackend` to DarkHelp and keep the existing Darknet path working (send this upstream if the maintainer agrees).
 - [ ] ONNX Runtime backend with execution providers **OpenVINO (Intel GPU/CPU/NPU) first**, then DirectML, CUDA, TensorRT, CoreML, ROCm and CPU.
 - [ ] Decoders for YOLOX, RT-DETR/RF-DETR/D-FINE, RTMDet/RTMDet-Ins, DeepLabV3, RTMPose and YOLO-seg (plugin).
@@ -226,11 +244,11 @@ Milestones assume one developer working full time. Each one ends with a release 
 - [ ] Render masks, keypoints and OBBs in the viewer.
 - [ ] Python bindings (DarkHelp already has `src-python`) for scripting.
 
-### M3 — Darknet native instance segmentation (weeks 19–30)
+### M3 — Darknet native instance segmentation (weeks 28–39)
 This is the biggest research item. Code lives in `darknet/src-lib/`.
 - [ ] Design: YOLACT/YOLOv8-seg style. A prototype mask branch (`[proto]` layer) plus mask coefficients added to the `[yolo]` layer outputs.
 - [ ] New layer `seg_proto_layer.cpp`, and `yolo_layer.cpp` extended with N mask coefficients per anchor.
-- [ ] Mask loss (BCE plus dice on the cropped prototype combination). CPU and CUDA kernels.
+- [ ] Mask loss (BCE plus dice on the cropped prototype combination). CPU, SYCL (Intel) and CUDA kernels.
 - [ ] Data loader: read YOLO-seg polygons, rasterize to masks, and keep augmentation consistent (mosaic, flip, scale).
 - [ ] cfg templates: `yolov4-tiny-seg.cfg` and `yolov7-tiny-seg.cfg`.
 - [ ] Mask mAP evaluation (COCO-style) in `darknet detector map`.
@@ -238,36 +256,27 @@ This is the biggest research item. Code lives in `darknet/src-lib/`.
 - [ ] Benchmark against RTMDet-Ins and YOLOv8-seg on a public dataset.
 - [ ] Later: native classification UI flow, then OBB/pose heads.
 
-### M3b — Darknet training on Intel GPU via SYCL (research, weeks 19–34, parallel to M3)
-- [ ] Install the Intel oneAPI Base Toolkit (DPC++ compiler, oneMKL, oneDNN) on the dev PC.
-- [ ] Run SYCLomatic on `darknet/src-lib/*.cu` and review the generated SYCL code.
-- [ ] Add a `DARKNET_TRY_SYCL` CMake option and a `GPU_SYCL` code path next to CUDA/ROCm.
-- [ ] Replace cuBLAS GEMM with oneMKL, and cuDNN conv with oneDNN.
-- [ ] Verify against the CPU: the same loss curve and mAP on a small dataset.
-- [ ] Benchmark training on Iris Xe against CPU. Document the results.
-- [ ] Offer it upstream to Hank.ai Darknet.
-
-### M4 — Assisted labeling (weeks 25–34, overlaps M3)
+### M4 — Assisted labeling (weeks 34–43, overlaps M3)
 - [ ] SAM2 / MobileSAM: run the encoder once per image (server-side, cached) and run the decoder on click/box. Convert the mask to a simplified polygon.
 - [ ] Pre-annotate the whole dataset with any model from the registry. Reviewers accept or reject.
 - [ ] Video: frame extraction, SAM2 video propagation, ByteTrack/OC-SORT ID tracking.
 - [ ] Active learning: rank unlabeled images by uncertainty (entropy, low margin) and diversity.
 - [ ] Magic wand and brush/eraser for masks.
 
-### M5 — Multi-user and collaboration (weeks 35–40)
+### M5 — Multi-user and collaboration (weeks 44–49)
 - [ ] PostgreSQL backend (same ORM models), plus S3/MinIO storage as an option.
 - [ ] Roles (admin, annotator, reviewer). Task assignment and a review queue with accept, reject and comment.
 - [ ] Audit log and per-user stats.
 - [ ] Docker Compose (server, Postgres, MinIO, GPU worker) and Helm as a later option.
 
-### M6 — Export and optimization (weeks 41–48)
+### M6 — Export and optimization (weeks 50–57)
 - [ ] Export: ONNX, TensorRT engine (FP16/INT8 with a calibration dataset), OpenVINO IR, CoreML, TFLite.
 - [ ] Inference: batching, engine caching, async pipelines, a benchmarking page (FPS/latency per EP).
 - [ ] Training: mixed precision in Darknet (FP16 where safe), faster data loader (threaded decode, cache), multi-GPU review.
 - [ ] UI: tiled rendering for very large images, web workers for polygon ops, lazy thumbnails.
 - [ ] Edge: a minimal build for Jetson/ARM (DarkHelp, TensorRT, a headless CLI).
 
-### M7 — Formats, polish, release 1.0 (weeks 49–52)
+### M7 — Formats, polish, release 1.0 (weeks 58–61)
 - [ ] Pascal VOC, CVAT XML, Label Studio JSON and LabelMe import/export.
 - [ ] Packaged installers for Windows (MSI) and Linux (.deb/AppImage), plus macOS as a stretch goal.
 - [ ] Docs site, tutorials, sample datasets, and a demo video.
@@ -296,7 +305,7 @@ This is the biggest research item. Code lives in `darknet/src-lib/`.
 | Upstream drift (Hank.ai Darknet moves fast) | Keep patches small and isolated, rebase monthly, contribute upstream |
 | Too much work for one person | MVP first, then strict milestone scope. M5 and M7 can slip |
 | Cross-platform GPU stack complexity | Lean on ONNX Runtime EPs and keep Darknet native training on CUDA/ROCm/CPU |
-| The dev PC has no CUDA (Intel Iris Xe only) | CPU training plus OpenVINO inference from day one. The SYCL port (M3b) is research. CUDA features get tested in CI or on a rented GPU |
+| The dev PC has no CUDA (Intel Iris Xe only) | CPU training plus OpenVINO inference from day one. The SYCL port (M0b) comes right after OpenVINO. CUDA features get tested in CI or on a rented GPU |
 | The SYCL port is large and may diverge from upstream | Keep it behind `DARKNET_TRY_SYCL`, generate it mechanically with SYCLomatic, and offer it upstream |
 | macOS / Apple GPU training | Inference only via CoreML. No native training on Metal in 1.0 |
 
@@ -306,7 +315,8 @@ This is the biggest research item. Code lives in `darknet/src-lib/`.
 
 1. ~~Create the forks and set the remotes.~~ Done.
 2. ~~Build Darknet and DarkHelp on this Windows machine and record the steps in `docs/build-windows.md`.~~ Done. CPU baseline is ~160–180 ms per image.
-3. Install OpenVINO and run the first Intel GPU inference (Darknet → ONNX → OpenVINO).
-4. Scaffold `server/` (Drogon hello-world plus SQLite) and `web/` (Vite + React + TS + Konva).
-5. Set up CI with the build matrix and the license gate.
-6. Start the M1 labeling canvas.
+3. **M0a:** install OpenVINO and run the first Intel GPU inference (Darknet → ONNX → OpenVINO). *In progress.*
+4. **M0b:** install oneAPI and start the SYCL port of Darknet for Iris Xe training.
+5. Scaffold `server/` (Drogon hello-world plus SQLite) and `web/` (Vite + React + TS + Konva).
+6. Set up CI with the build matrix and the license gate.
+7. Start the M1 labeling canvas.
