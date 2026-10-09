@@ -8,6 +8,7 @@
 //
 // Usage: ov-bench <model.onnx> <names> <image> [image...] [--device GPU] [--precision f16|f32]
 //                 [--iters 50] [--threshold 0.5] [--nms 0.45] [--cache <dir>] [--save <dir>] [--raw]
+//        ov-bench --list-devices
 
 #include <openvino/openvino.hpp>
 #include <opencv2/opencv.hpp>
@@ -209,6 +210,18 @@ int main(int argc, char * argv[])
 {
 	try
 	{
+		if (argc == 2 and std::string(argv[1]) == "--list-devices")
+		{
+			// machine-readable device list (used by the DarkStudio server): "<device>\t<full name>"
+			ov::Core core;
+			std::cout << "openvino\t" << ov::get_openvino_version().buildNumber << std::endl;
+			for (const auto & device : core.get_available_devices())
+			{
+				std::cout << device << "\t" << core.get_property(device, ov::device::full_name) << std::endl;
+			}
+			return 0;
+		}
+
 		const Options opt	= parse(argc, argv);
 		const auto names	= load_names(opt.names);
 
