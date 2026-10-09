@@ -18,6 +18,8 @@ These rules apply to every session in this project.
 
 - `darknet/`, `DarkHelp/`, `DarkMark/` are submodules. `origin` is github.com/amirgol64/<repo> and `upstream` is codeberg.org/CCodeRun/<repo> (fetch only).
 - Commit changes inside a submodule to that fork first, then commit the updated submodule pointer in DarkStudio.
+- **darknet development happens on branch `sycl`** of the fork (the SYCL / Intel GPU backend). Keep `master` equal to upstream. Put fixes that help upstream in their own commits.
+- The SYCL build: `tools\sycl-migrate\build-darknet-sycl.bat` → `build/install-sycl/`. It needs `C:\Program Files (x86)\Intel\oneAPI\2026.1\bin` on PATH at run time. Check correctness with `tools\sycl-migrate\compare-cpu-sycl.ps1` after kernel changes. `src-lib/sycl/*.dp.cpp` are maintained by hand now; re-running `import.sh` overwrites them.
 - Windows deps come from vcpkg at `C:\src\vcpkg` (triplet `x64-windows`). Build from a VS 2022 x64 Developer environment.
 - Follow [docs/build-windows.md](docs/build-windows.md): run CMake from inside `darknet/build`, use `-DDARKNET_TRY_OPENBLAS=OFF`, install to `build/install/`, and point DarkHelp at a **copy** of a `.cfg` in `models/pretrained/` (it rewrites cfg files).
 - oneAPI 2026.1 lives at `C:\Program Files (x86)\Intel\oneAPI\2026.1`. Use `2026.1\oneapi-vars.bat` with `vswhere` on PATH and `NoDefaultCurrentDirectoryInExePath` cleared (see `tools\sycl-check\build.bat`). `icx` takes MSVC-style flags on Windows.

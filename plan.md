@@ -159,7 +159,7 @@ Upstream Darknet only accelerates on NVIDIA CUDA and AMD ROCm. On Intel hardware
 | **Inference: Darknet models** | Darknet → ONNX (`src-onnx`) → **OpenVINO** (GPU plugin on Iris Xe, CPU plugin as fallback) | Apache-2.0 | ✅ **M0a**: 85 FPS on Iris Xe (FP16) |
 | **Inference: all other models** | DarkHelp `IBackend` → **ONNX Runtime + OpenVINO EP** (alternatively DirectML EP) | MIT / Apache-2.0 | M2 |
 | **Training: CPU** | Darknet CPU build with **AVX2 + OpenMP** (built-in GEMM, ~20× faster than vcpkg OpenBLAS on Windows), later oneDNN for conv/GEMM | Apache-2.0 | ✅ builds (M0) |
-| **Training: Intel GPU** | Port Darknet's CUDA kernels to **SYCL (oneAPI DPC++)**: use **SYCLomatic** for the first draft, then use oneMKL for GEMM and oneDNN for conv. Adds a `DARKNET_TRY_SYCL` CMake option alongside CUDA/ROCm | Apache-2.0 (w/ LLVM exception) | **M0b** (moved up, weeks 5–12) |
+| **Training: Intel GPU** | Port Darknet's CUDA kernels to **SYCL (oneAPI DPC++)**: use **SYCLomatic** for the first draft, then use oneMKL for GEMM and oneDNN for conv. Adds a `DARKNET_TRY_SYCL` CMake option alongside CUDA/ROCm | Apache-2.0 (w/ LLVM exception) | **M0b**: inference ✅ (identical to CPU, 6.5× faster), training 🔨 |
 
 What to expect on Iris Xe (~2 TFLOPS FP32, shared memory): inference on yolov4-tiny-class models should be real-time through OpenVINO FP16. Training on the iGPU will be several times faster than CPU but far slower than a discrete NVIDIA GPU, so for small datasets and tiny models it's practical. Big training runs will still want a CUDA/ROCm machine or the multi-user GPU server (M5).
 
@@ -216,15 +216,20 @@ Milestones assume one developer working full time. Each one ends with a release 
 Moved up on 2026-10-09: the dev PC has only an Iris Xe, so GPU training on it speeds up all later work. Expect ~3–5× faster than CPU for tiny models.
 - [x] Install Intel oneAPI 2026.1 (DPC++/C++ compiler, oneMKL, oneDNN, TBB, oneDPL). `sycl-ls` sees the Iris Xe through Level Zero.
 - [x] SYCLomatic isn't in oneAPI 2026 and has no Windows build, so set it up in WSL Ubuntu with CUDA 12.9 headers and a no-root sysroot (`tools/sycl-migrate/setup-wsl.sh`).
-- [x] Audit Darknet's GPU code for FP64 use: **no `double` in any kernel**. The Iris Xe (no FP64) is fine.
+- [x] Audit Darknet's GPU code for FP64 use: no kernel declares a `double`, **but some use double literals** (e.g. `.001*x`, which promotes the math to FP64). Inference kernels run fine. See the follow-up task below.
 - [x] `tools/sycl-check`: the Iris Xe has max work-group size 512 (= Darknet `BLOCK`) and sub-groups 8/16/32. **oneMKL SGEMM reaches 670–960 GFLOPS on yolov4-tiny shapes** (1,325 peak), ~4× the CPU.
 - [x] Run SYCLomatic on `darknet/src-lib/*.cu` (`tools/sycl-migrate/migrate.sh`): 10 files, **0 errors**, 330 warnings, triaged in `docs/intel-gpu.md`.
 - [ ] Review the 3 correctness warnings (DPCT1118/1121, group functions in divergent code in `im2col_kernels`).
-- [ ] Add a `DARKNET_TRY_SYCL` CMake option to the darknet fork: find icx/oneMKL and define `DARKNET_GPU` + `DARKNET_GPU_SYCL` (no cuDNN, like ROCm).
-- [ ] Bring the migrated kernels into the fork as `src-lib/sycl/*.dp.cpp`, built only when `DARKNET_GPU_SYCL` is set. Disable `wmma` (XNOR Tensor Core) kernels and CUDA Graphs under SYCL.
-- [ ] Port the host side (`dark_cuda.cpp`, `darknet_gpu.hpp`): device selection, memory, streams → SYCL queue, cuBLAS SGEMM → oneMKL, cuRAND → oneMKL RNG, error checks → exceptions.
+- [x] Add a `DARKNET_TRY_SYCL` CMake option to the darknet fork (branch **`sycl`**). It requires icx/icpx + oneMKL and defines `DARKNET_GPU` + `DARKNET_GPU_SYCL`, with no cuDNN (like ROCm). It also has optional `DARKNET_SYCL_TARGETS` for AOT, IntelLLVM detection so AVX stays on, and leaves the oneAPI DLLs out of the install (Intel license).
+- [x] Bring the migrated kernels into the fork as `src-lib/sycl/*.dp.cpp` (`tools/sycl-migrate/import.sh`): `dpct` → `dn_sycl::` helpers (no dpct dependency), `CHECK_CUDA(0)` → `cudaPeekAtLastError()`. `wmma` is off (`DN_SYCL_CUDA_ARCH=0`) and CUDA graphs are stubs.
+- [x] Fix: 19 kernel lambdas captured the whole `Layer`/`NetworkState` (3.3 KB > the Intel GPU's 2 KB argument limit). They now capture only the fields they use.
+- [x] Port the host side with a **CUDA-on-SYCL compatibility layer** (`darknet_sycl.hpp/.cpp`, ~40 functions). `dark_cuda.cpp` and all layers compile **unchanged**. Covers USM memory, in-order queues as streams, cuBLAS → oneMKL GEMM, cuRAND → oneMKL RNG, and exceptions → `cudaError_t`.
+- [x] Upstream build fixes found along the way: SYCL headers must come before Darknet's global `node`/`list` types; `gemm.cpp` `__m256` indexing for clang; a `getopt.h` forward declaration; and the ONNX tool now respects `DARKNET_TRY_ONNX`.
+- [x] Inference on the Iris Xe via SYCL gives **identical detections to the CPU** on all 6 sample images (0 class mismatches, 0.0000 probability difference, 0 px box difference) at **27.5 ms vs 180 ms per image (6.5×)**. Checked with `tools/sycl-migrate/compare-cpu-sycl.ps1`.
+- [ ] Make kernel literals single precision (`-Wdouble-promotion` audit, `0.5` → `0.5f`). This is required for training kernels on GPUs without FP64, and it also speeds up CUDA.
+- [ ] AOT-compile for Iris Xe (`-DDARKNET_SYCL_TARGETS=intel_gpu_tgllp`) to remove the first-run JIT delay. Measure startup.
+- [ ] Build DarkHelp against the SYCL Darknet, so DarkHelp/DarkStudio can use the Iris Xe directly.
 - [ ] Later: cuDNN-style conv with oneDNN, and FP16 (the Iris Xe supports fp16).
-- [ ] Inference on the Iris Xe via SYCL gives the same detections as the CPU on the sample images.
 - [ ] Training check: train yolov4-tiny on a small dataset on CPU and on SYCL. The loss curve and mAP should match.
 - [ ] Benchmark training (iterations per second) on the Iris Xe against the CPU. Document it in `docs/`.
 - [ ] Offer it upstream to Hank.ai Darknet.
@@ -328,7 +333,7 @@ This is the biggest research item. Code lives in `darknet/src-lib/`.
 1. ~~Create the forks and set the remotes.~~ Done.
 2. ~~Build Darknet and DarkHelp on this Windows machine and record the steps in `docs/build-windows.md`.~~ Done. CPU baseline is ~160–180 ms per image.
 3. ~~**M0a:** install OpenVINO and run the first Intel GPU inference.~~ Done: 85 FPS on Iris Xe, ~13× the Darknet CPU.
-4. **M0b:** SYCL port of Darknet for Iris Xe training. *In progress:* the toolchain is ready, the first migration is clean, and oneMKL SGEMM runs at ~1 TFLOPS. Next: the `DARKNET_TRY_SYCL` CMake option and the host-side port.
+4. **M0b:** SYCL port of Darknet for Iris Xe training. *In progress:* **inference runs on the Iris Xe with identical results to the CPU, 6.5× faster.** Next: single-precision literals, then the training check (CPU vs SYCL loss curve).
 5. Scaffold `server/` (Drogon hello-world plus SQLite) and `web/` (Vite + React + TS + Konva).
 6. Set up CI with the build matrix and the license gate.
 7. Start the M1 labeling canvas.
