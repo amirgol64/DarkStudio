@@ -20,7 +20,8 @@ ADD_LIBRARY (darkstudio_core STATIC
 	src/parsers.cpp
 	src/process.cpp
 	src/settings.cpp
-	src/system_info.cpp)
+	src/system_info.cpp
+	src/training.cpp)
 TARGET_INCLUDE_DIRECTORIES (darkstudio_core PUBLIC src)
 TARGET_LINK_LIBRARIES (darkstudio_core PUBLIC Drogon::Drogon)
 
@@ -38,6 +39,7 @@ ENDIF ()
 ENABLE_TESTING ()
 ADD_EXECUTABLE (darkstudio-tests tests/tests.cpp)
 TARGET_LINK_LIBRARIES (darkstudio-tests PRIVATE darkstudio_core)
+TARGET_COMPILE_DEFINITIONS (darkstudio-tests PRIVATE DARKSTUDIO_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/..")
 ADD_TEST (NAME darkstudio-tests COMMAND darkstudio-tests)
 
 INSTALL (TARGETS darkstudio-server RUNTIME DESTINATION bin)

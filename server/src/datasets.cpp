@@ -28,45 +28,6 @@ namespace darkstudio::datasets
 			return utf8(fs::relative(p, root));
 		}
 
-		/// Class names for a folder: the first *.names file in the folder or one of its parents (up to @p root).
-		std::vector<std::string> find_names(const fs::path & folder, const fs::path & root)
-		{
-			const fs::path base = fs::weakly_canonical(root);
-			for (fs::path dir = fs::weakly_canonical(folder); ; dir = dir.parent_path())
-			{
-				if (fs::is_directory(dir))
-				{
-					for (const auto & entry : fs::directory_iterator(dir))
-					{
-						if (entry.path().extension() == ".names")
-						{
-							std::vector<std::string> names;
-							std::ifstream ifs(entry.path());
-							std::string line;
-							while (std::getline(ifs, line))
-							{
-								while (not line.empty() and (line.back() == '\r' or std::isspace(static_cast<unsigned char>(line.back()))))
-								{
-									line.pop_back();
-								}
-								if (not line.empty())
-								{
-									names.push_back(line);
-								}
-							}
-							return names;
-						}
-					}
-				}
-				// folders always come from resolve(), so walking up reaches the datasets root
-				if (dir == base or dir == dir.parent_path())
-				{
-					break;
-				}
-			}
-			return {};
-		}
-
 		Json::Value names_json(const std::vector<std::string> & names)
 		{
 			Json::Value arr = Json::arrayValue;
@@ -84,6 +45,45 @@ namespace darkstudio::datasets
 		std::string ext = p.extension().string();
 		std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 		return ext == ".jpg" or ext == ".jpeg" or ext == ".png" or ext == ".bmp";
+	}
+
+
+	std::vector<std::string> find_names(const fs::path & folder, const fs::path & root)
+	{
+		const fs::path base = fs::weakly_canonical(root);
+		for (fs::path dir = fs::weakly_canonical(folder); ; dir = dir.parent_path())
+		{
+			if (fs::is_directory(dir))
+			{
+				for (const auto & entry : fs::directory_iterator(dir))
+				{
+					if (entry.path().extension() == ".names")
+					{
+						std::vector<std::string> names;
+						std::ifstream ifs(entry.path());
+						std::string line;
+						while (std::getline(ifs, line))
+						{
+							while (not line.empty() and (line.back() == '\r' or std::isspace(static_cast<unsigned char>(line.back()))))
+							{
+								line.pop_back();
+							}
+							if (not line.empty())
+							{
+								names.push_back(line);
+							}
+						}
+						return names;
+					}
+				}
+			}
+			// folders always come from resolve(), so walking up reaches the datasets root
+			if (dir == base or dir == dir.parent_path())
+			{
+				break;
+			}
+		}
+		return {};
 	}
 
 

@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { Image as KImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva'
 import type Konva from 'konva'
 import { api, type Box, type DatasetFolder, type DatasetImage } from '../api'
-import { ErrorText } from '../components'
+import { ErrorText, PageHelp } from '../components'
 import { useAction } from '../util'
 
 const colour = (cls: number) => `hsl(${(cls * 67) % 360} 80% 55%)`
@@ -234,6 +234,7 @@ export default function Annotation() {
           <button disabled={!dirty || action.busy} onClick={() => action.run(save)}>{t('common.save')}</button>
         </div>
       </div>
+      <PageHelp page="annotation" anchor="#42-label-the-images-annotation" defaultOpen={false} />
       <ErrorText error={action.error} />
       {folders.length === 0 && !action.busy && <p className="muted">{t('annot.noFolder')}</p>}
 

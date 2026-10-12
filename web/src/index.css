@@ -124,6 +124,33 @@ label.check { display: flex; gap: 8px; align-items: center; }
 .muted { color: var(--muted); }
 .mono { font-family: var(--mono); font-size: 12px; }
 
+/* help: "?" tips and the per-page "How to use" panel */
+.help { position: relative; display: inline-flex; vertical-align: middle; margin-inline-start: 4px; }
+label.field > span:first-child { display: flex; align-items: center; min-height: 17px; }
+.help-btn { margin-block: -2px; }
+.help-btn {
+  display: inline-grid; place-items: center; width: 16px; height: 16px; padding: 0; border-radius: 50%;
+  background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); font-size: 11px; font-weight: 600; line-height: 1;
+}
+.help-btn:hover, .help-btn[aria-expanded='true'] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.help-pop {
+  position: absolute; z-index: 20; top: 22px; inset-inline-start: -8px; width: min(300px, 80vw);
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+  box-shadow: 0 4px 18px rgb(0 0 0 / 0.18); font-size: 13px; font-weight: 400; line-height: 1.45; white-space: normal;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.page-help { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 16px; }
+.page-help summary { cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--muted); font-weight: 500; }
+.page-help[open] summary { margin-bottom: 6px; color: var(--text); }
+.page-help ol { margin: 0 0 6px; padding-inline-start: 22px; }
+.page-help li { margin: 2px 0; }
+.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.segmented button { background: transparent; color: var(--text); border-radius: 0; padding: 4px 12px; }
+.segmented button.active { background: var(--accent); color: var(--accent-text); }
+@media (min-width: 1000px) { .grid.train-top { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); align-items: start; } }
+fieldset.group { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px 0; margin: 0 0 12px; min-width: 0; }
+fieldset.group legend { padding: 0 6px; font-size: 12px; color: var(--muted); }
+
 /* tables */
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: start; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }

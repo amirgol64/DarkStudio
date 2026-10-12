@@ -5,6 +5,7 @@
 
 #include "events.hpp"
 #include "parsers.hpp"
+#include "training.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -286,9 +287,6 @@ namespace darkstudio
 			{
 				throw std::invalid_argument("backend must be cpu or sycl");
 			}
-			const fs::path default_dir = s.root / "build" / "train-test" / "legogears";
-			const fs::path data = require_file(string_param(p, "data", utf8(default_dir / "LegoGears.data")), "data file");
-			const fs::path cfg_src = require_file(string_param(p, "cfg", utf8(default_dir / "LegoGears.cfg")), "cfg file");
 
 			const fs::path bin = backend == "cpu" ? s.darknet_cpu_bin : s.darknet_sycl_bin;
 			o.executable = executable(bin, "darknet");
@@ -306,18 +304,46 @@ namespace darkstudio
 				o.stdin_text = "yes\n";	// Darknet asks for confirmation before training on a CPU
 			}
 
-			// copy the cfg so later changes (e.g. a new "prepare" job) do not affect this run
-			const fs::path cfg = job.dir / cfg_src.filename();
-			fs::copy_file(cfg_src, cfg, fs::copy_options::overwrite_existing);
-			const fs::path data_copy = copy_data_file(data, job.dir);
+			fs::path cfg;
+			fs::path data_copy;
+			fs::path weights;
+			const bool generated = job.kind == "train" and p.isMember("dataset");
+			if (generated)
+			{
+				// "Normal" mode: write .data, .names, train/valid lists and .cfg from a datasets/ folder and a base model
+				const auto r = training::prepare(s, p, job.dir);
+				cfg			= r.cfg;
+				data_copy	= r.data;
+				weights		= r.weights;
+				job.result["data"]			= utf8(r.data);
+				job.result["cfg"]			= utf8(r.cfg);
+				job.result["classes"]		= r.classes;
+				job.result["train_images"]	= Json::UInt64(r.train_images);
+				job.result["valid_images"]	= Json::UInt64(r.valid_images);
+				job.result["pretrained"]	= utf8(r.weights);
+			}
+			else
+			{
+				const fs::path default_dir = s.root / "build" / "train-test" / "legogears";
+				const fs::path data = require_file(string_param(p, "data", utf8(default_dir / "LegoGears.data")), "data file");
+				const fs::path cfg_src = require_file(string_param(p, "cfg", utf8(default_dir / "LegoGears.cfg")), "cfg file");
+				// copy the cfg so later changes (e.g. a new "prepare" job) do not affect this run
+				cfg = job.dir / cfg_src.filename();
+				fs::copy_file(cfg_src, cfg, fs::copy_options::overwrite_existing);
+				data_copy = copy_data_file(data, job.dir);
+			}
+			// an explicit weights file wins over the model's pretrained weights
+			if (const std::string w = string_param(p, "weights", ""); not w.empty())
+			{
+				weights = require_file(w, "weights");
+			}
 
 			if (job.kind == "train")
 			{
 				o.arguments = {"detector", "train", utf8(data_copy), utf8(cfg)};
-				const std::string weights = string_param(p, "weights", "");
 				if (not weights.empty())
 				{
-					o.arguments.push_back(utf8(require_file(weights, "weights")));
+					o.arguments.push_back(utf8(weights));
 				}
 				o.arguments.push_back("-dont_show");
 				if (bool_param(p, "map", true))
@@ -329,7 +355,10 @@ namespace darkstudio
 			}
 			else
 			{
-				const fs::path weights = require_file(string_param(p, "weights", ""), "weights");
+				if (weights.empty())
+				{
+					throw std::invalid_argument("weights are required for mAP");
+				}
 				const std::string iou = string_param(p, "iou", "0.50");
 				o.arguments = {"detector", "map", utf8(data_copy), utf8(cfg), utf8(weights), "-iou_thresh", iou};
 				job.title = "mAP@" + iou + " " + weights.filename().string() + " (" + backend + ")";

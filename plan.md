@@ -250,6 +250,14 @@ Decided 2026-10-09: build the first slice of the **real** app (Drogon C++ server
 - [x] **Settings** view: all tool paths, the default OpenVINO device and precision, the model cache, theme and language (saved on the server; browsers without their own choice follow it).
 - [x] `darkstudio.bat`: one command that builds the server and UI if needed, then starts and opens the browser.
 - [x] End-to-end test: API jobs (OpenVINO 10.5 ms/95 FPS on Iris Xe, SYCL training with live metrics), 409/400 handling, history after restart, and headless-Edge screenshots of every page (dark + Hebrew RTL).
+- [x] User guide `docs/how_to_use.md`: from a fresh clone to training on your own dataset (labeling, `.data`/`.cfg`, partial pretrained weights, results), linked from the README.
+- [x] Training setup from a dataset folder (decided 2026-10-12): the server writes `.data`, `.names`, train/valid lists and `.cfg` (size, iterations, steps, `classes`, `filters`) from a labeled `datasets/` folder and a base model, checks label class ids, and makes the partial pretrained weights (`darknet partial`, `yolov4-tiny.conv.29`) on first use. `GET /api/training/models`, `GET /api/training/datasets`. Tested with a 60-iteration Iris Xe run and mAP evaluation.
+- [x] Built-in model list: YOLOv4-tiny and YOLOv4-tiny-3L (COCO partial weights), YOLOv7-tiny (from scratch). Shows whether the weights are ready, will be prepared, or are missing.
+- [x] Training tab **Normal / Advanced**. Normal: dataset, model, image size, iterations (Darknet's suggestion), device, mAP. Advanced: width/height, batch, subdivisions, learning rate, validation %, pretrained on/off, custom weights, augmentation (mosaic, flip, hue, saturation, exposure, angle), own `.data`/`.cfg`. The choice is remembered.
+- [x] In-app help: a **?** tip on every training option, with a link to the guide section, and a foldable "How to use this page" panel on every page (EN + HE).
+- [ ] Anchor recalculation for the dataset (`darknet detector calc_anchors`) in Advanced.
+- [ ] Pretrained start for YOLOv7-tiny (find the right weights and partial layer count).
+- [ ] Serve the guide from the local server so the **?** links work offline.
 - [ ] Translate the server-generated job titles (currently English).
 - [ ] GPU memory and utilization in the training view (Level Zero Sysman).
 
@@ -259,7 +267,7 @@ Decided 2026-10-09: build the first slice of the **real** app (Drogon C++ server
 - [ ] Local JWT auth (a single admin account in local mode).
 - [ ] Image ingest: upload a folder or a server path, generate thumbnails, store EXIF.
 - [ ] Import and export Darknet/YOLO txt, YOLO-seg polygons and COCO JSON.
-- [ ] Training job: generate `.cfg`, `.data` and `train.txt` (port DarkMark's ideas, not its code). Spawn Darknet, parse the log, stream loss/mAP over WebSocket, support stop and resume.
+- [ ] Training job: generate `.cfg`, `.data` and `train.txt` (port DarkMark's ideas, not its code). Spawn Darknet, parse the log, stream loss/mAP over WebSocket, support stop and resume. *(Generation, live streaming and stop work since M0c; resume and SQLite-backed projects remain.)*
 - [ ] Inference job through DarkHelp with the Darknet backend. Results can be saved as pre-annotations.
 - [ ] Device picker for training and inference jobs: CPU, Intel GPU (SYCL / OpenVINO from M0a/M0b), and CUDA/ROCm when present.
 

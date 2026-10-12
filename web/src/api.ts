@@ -89,6 +89,30 @@ export interface DatasetFolder {
   names: string[]
 }
 
+/** A base network from the server's model list (server/src/training.cpp). */
+export interface TrainingModel {
+  id: string
+  name: string
+  cfg: string
+  cfg_found: boolean
+  width: number
+  height: number
+  license: string
+  pretrained: boolean
+  weights: string
+  weights_url: string
+  weights_found: boolean
+  partial_found: boolean
+}
+
+/** A folder that can be trained: labeled images in it or its sub-folders, and the class names found for it. */
+export interface TrainingDataset {
+  path: string
+  labeled: number
+  with_boxes: number
+  names: string[]
+}
+
 export interface DatasetImage {
   path: string
   name: string
@@ -140,6 +164,8 @@ export const api = {
     request<{ job_id: string; total: number; lines: LogLine[] }>('GET', `/api/jobs/${q(id)}/log?since=${since}`),
   jobMetrics: (id: string) => request<TrainingMetric[]>('GET', `/api/jobs/${q(id)}/metrics`),
   jobImageUrl: (id: string, name: string) => `/api/jobs/${q(id)}/image?name=${q(name)}`,
+  trainingDatasets: () => request<TrainingDataset[]>('GET', '/api/training/datasets'),
+  trainingModels: () => request<TrainingModel[]>('GET', '/api/training/models'),
   datasets: () => request<DatasetFolder[]>('GET', '/api/datasets'),
   datasetImages: (folder: string) =>
     request<{ folder: string; names: string[]; images: DatasetImage[] }>('GET', `/api/datasets/images?folder=${q(folder)}`),

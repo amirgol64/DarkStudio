@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { api, type Settings } from '../api'
 import { languages, setLanguage } from '../i18n'
 import { applyTheme, useAction } from '../util'
-import { ErrorText } from '../components'
+import { ErrorText, PageHelp } from '../components'
 
 const pathKeys = [
   'darknet_cpu_bin', 'darknet_sycl_bin', 'oneapi_bin', 'openvino_bin', 'openvino_tbb_bin',
@@ -48,6 +48,7 @@ export default function SettingsPage() {
           <button disabled={action.busy} onClick={save}>{t('common.save')}</button>
         </div>
       </div>
+      <PageHelp page="settings" anchor="#6-logs-settings-and-troubleshooting" />
       <ErrorText error={action.error} />
 
       <div className="card">

@@ -10,6 +10,7 @@
 #include "jobs.hpp"
 #include "settings.hpp"
 #include "system_info.hpp"
+#include "training.hpp"
 
 #include <drogon/drogon.h>
 
@@ -237,6 +238,17 @@ int main(int argc, char * argv[])
 				}
 				return HttpResponse::newFileResponse(file.string());
 			});
+		}, {Get});
+
+		// --- training setup ---
+		app().registerHandler("/api/training/models", [settings](const HttpRequestPtr &, Callback && cb)
+		{
+			guarded(cb, [&] { return json_response(darkstudio::training::models_json(settings->get())); });
+		}, {Get});
+
+		app().registerHandler("/api/training/datasets", [settings](const HttpRequestPtr &, Callback && cb)
+		{
+			guarded(cb, [&] { return json_response(darkstudio::training::datasets_json(settings->get().datasets_dir)); });
 		}, {Get});
 
 		// --- datasets / annotation ---

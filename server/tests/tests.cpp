@@ -5,13 +5,16 @@
 
 #include "datasets.hpp"
 #include "parsers.hpp"
+#include "training.hpp"
 
 #include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <sstream>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -171,6 +174,174 @@ namespace
 		CHECK(parsers::strip_ansi("\x1B[1;32mIris Xe\x1B[0m ok") == "Iris Xe ok");
 	}
 
+	/// Value of "key=..." in the n-th (0-based) section called @p section of a cfg text.
+	std::string cfg_value(const std::string & cfg, const std::string & section, int n, const std::string & key)
+	{
+		std::istringstream ss(cfg);
+		std::string line;
+		int seen = -1;
+		bool inside = false;
+		while (std::getline(ss, line))
+		{
+			if (not line.empty() and line[0] == '[')
+			{
+				inside = line == "[" + section + "]" and ++ seen == n;
+				continue;
+			}
+			const auto eq = line.find('=');
+			if (inside and eq != std::string::npos)
+			{
+				std::string k = line.substr(0, eq);
+				k.erase(k.find_last_not_of(" \t") + 1);
+				if (k == key)
+				{
+					std::string v = line.substr(eq + 1);
+					v.erase(0, v.find_first_not_of(" \t"));
+					return v;
+				}
+			}
+		}
+		return "";
+	}
+
+	void test_make_cfg()
+	{
+		const std::string tpl =
+			"[net]\nbatch=1\nsubdivisions=1\nwidth=416\nheight=416\nmax_batches = 2000200\nsteps=1600000,1800000\n\n"
+			"[convolutional]\nfilters=255\nactivation=linear\n\n[yolo]\nmask = 3,4,5\nclasses=80\nnum=6\n\n"
+			"[route]\nlayers=-4\n\n[convolutional]\nfilters=255\n\n[yolo]\nmask = 0,1\nclasses=80\nnum=6\n";
+		training::CfgOptions o;
+		o.classes = 3;
+		o.width = 320;
+		o.height = 256;
+		o.max_batches = 1000;
+		o.mosaic = false;
+		o.learning_rate = 0.001;
+		const std::string cfg = training::make_cfg(tpl, o);
+		CHECK(cfg_value(cfg, "net", 0, "batch") == "64");
+		CHECK(cfg_value(cfg, "net", 0, "width") == "320");
+		CHECK(cfg_value(cfg, "net", 0, "height") == "256");
+		CHECK(cfg_value(cfg, "net", 0, "max_batches") == "1000");
+		CHECK(cfg_value(cfg, "net", 0, "steps") == "800,900");
+		CHECK(cfg_value(cfg, "net", 0, "burn_in") == "200");
+		CHECK(cfg_value(cfg, "net", 0, "mosaic") == "0");
+		CHECK(cfg_value(cfg, "net", 0, "learning_rate") == "0.001");
+		CHECK(cfg_value(cfg, "convolutional", 0, "filters") == "24");	// (3 + 5) * 3 masks
+		CHECK(cfg_value(cfg, "convolutional", 1, "filters") == "16");	// (3 + 5) * 2 masks
+		CHECK(cfg_value(cfg, "yolo", 0, "classes") == "3");
+		CHECK(cfg_value(cfg, "yolo", 1, "classes") == "3");
+		CHECK(cfg_value(cfg, "route", 0, "layers") == "-4");
+
+		bool rejected = false;
+		try { training::make_cfg("[net]\nbatch=1\n", o); } catch (const std::invalid_argument &) { rejected = true; }
+		CHECK(rejected);
+
+		// the real templates of the built-in models
+		for (const auto & m : training::models())
+		{
+			const auto file = std::filesystem::path(DARKSTUDIO_ROOT) / m.cfg;
+			CHECK(std::filesystem::is_regular_file(file));
+			std::ifstream ifs(file);
+			std::stringstream text;
+			text << ifs.rdbuf();
+			const std::string real = training::make_cfg(text.str(), o);
+			const int heads = m.id == "yolov4-tiny" ? 2 : 3;
+			for (int i = 0; i < heads; i ++)
+			{
+				CHECK(cfg_value(real, "yolo", i, "classes") == "3");
+			}
+			CHECK(cfg_value(real, "yolo", heads, "classes").empty());
+			CHECK(real.find("filters=255") == std::string::npos);
+			CHECK(real.find("filters=24") != std::string::npos);
+		}
+	}
+
+	void test_split()
+	{
+		std::vector<std::filesystem::path> images;
+		for (int i = 0; i < 20; i ++)
+		{
+			images.push_back("img" + std::to_string(i) + ".jpg");
+		}
+		std::vector<std::filesystem::path> train, valid;
+		training::split(images, 10, train, valid);
+		CHECK(train.size() == 18);
+		CHECK(valid.size() == 2);
+		CHECK(valid[0] == "img9.jpg");
+		training::split(images, 0, train, valid);
+		CHECK(train.size() == 20);
+		CHECK(valid.size() == 20);
+		training::split({"a.jpg", "b.jpg"}, 10, train, valid);
+		CHECK(train.size() == 2);
+		CHECK(valid.size() == 1);
+	}
+
+	void test_prepare_training()
+	{
+		namespace fs = std::filesystem;
+		const fs::path base = fs::temp_directory_path() / "darkstudio-tests-train";
+		fs::remove_all(base);
+		Settings s;
+		s.root			= DARKSTUDIO_ROOT;
+		s.datasets_dir	= base / "datasets";
+		s.models_dir	= base / "models";
+		const fs::path set = s.datasets_dir / "my set";
+		fs::create_directories(set / "sub");
+		fs::create_directories(base / "job");
+		std::ofstream(set / "my.names") << "cat\ndog\n";
+		for (int i = 0; i < 10; i ++)
+		{
+			const fs::path img = set / (i < 5 ? fs::path("sub") : fs::path()) / ("i" + std::to_string(i) + ".jpg");
+			std::ofstream(img) << "x";
+			std::ofstream(fs::path(img).replace_extension(".txt")) << (i % 2) << " 0.5 0.5 0.1 0.1\n";
+		}
+		std::ofstream(set / "unlabeled.jpg") << "x";
+
+		const auto sets = training::datasets_json(s.datasets_dir);
+		CHECK(sets.size() == 2);		// "my set" (10 labeled, including sub/) and "my set/sub" (5)
+		CHECK(sets[0]["path"].asString() == "my set");
+		CHECK(sets[0]["labeled"].asInt() == 10);
+		CHECK(sets[0]["names"].size() == 2);
+		CHECK(sets[1]["path"].asString() == "my set/sub");
+		CHECK(sets[1]["labeled"].asInt() == 5);
+		CHECK(sets[1]["names"].size() == 2);	// found in the parent folder
+
+		Json::Value p;
+		p["dataset"]		= "my set";
+		p["model"]			= "yolov4-tiny";
+		p["max_batches"]	= 100;
+		p["valid_percent"]	= 20;
+		p["pretrained"]		= false;
+		const auto r = training::prepare(s, p, base / "job");
+		CHECK(r.name == "my_set");
+		CHECK(r.classes == 2);
+		CHECK(r.train_images == 8);
+		CHECK(r.valid_images == 2);
+		CHECK(r.weights.empty());
+		CHECK(fs::is_regular_file(base / "job" / "my_set.data"));
+		CHECK(fs::is_regular_file(base / "job" / "my_set.names"));
+		std::stringstream cfg;
+		cfg << std::ifstream(r.cfg).rdbuf();
+		CHECK(cfg_value(cfg.str(), "net", 0, "max_batches") == "100");
+		CHECK(cfg_value(cfg.str(), "yolo", 0, "classes") == "2");
+
+		auto expect_error = [&](Json::Value q)
+		{
+			bool rejected = false;
+			try { training::prepare(s, q, base / "job"); } catch (const std::invalid_argument &) { rejected = true; }
+			CHECK(rejected);
+		};
+		Json::Value q = p; q["dataset"] = "../outside";				expect_error(q);
+		q = p; q["model"] = "nope";									expect_error(q);
+		q = p; q["width"] = 300;									expect_error(q);
+		q = p; q["batch"] = 64; q["subdivisions"] = 3;				expect_error(q);
+		std::ofstream(set / "sub" / "i0.txt") << "7 0.5 0.5 0.1 0.1\n";		// class 7 is not in the names file
+		expect_error(p);
+
+		std::error_code ec;
+		fs::remove_all(base, ec);
+	}
+
 	void test_datasets()
 	{
 		namespace fs = std::filesystem;
@@ -227,6 +398,16 @@ int main()
 	test_openvino_devices();
 	test_strip_ansi();
 	test_datasets();
+	test_make_cfg();
+	test_split();
+	try
+	{
+		test_prepare_training();
+	}
+	catch (const std::exception & e)
+	{
+		check(false, std::string("test_prepare_training threw: ") + e.what(), __LINE__);
+	}
 
 	std::cout << (failures == 0 ? "OK" : "FAILED") << ": " << (checks - failures) << "/" << checks << " checks passed" << std::endl;
 	return failures == 0 ? 0 : 1;

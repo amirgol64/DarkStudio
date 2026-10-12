@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { sortJobs, useStore } from '../store'
-import { LogView, StatusBadge } from '../components'
+import { LogView, PageHelp, StatusBadge } from '../components'
 import { duration } from '../util'
 
 export default function Logs() {
@@ -19,6 +19,7 @@ export default function Logs() {
   return (
     <div className="stack">
       <div className="page-head"><h1>{t('nav.logs')}</h1></div>
+      <PageHelp page="logs" anchor="#6-logs-settings-and-troubleshooting" />
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 340px) 1fr', gap: 14 }}>
         <div className="card" style={{ padding: 8, maxHeight: 'calc(100vh - 140px)', overflow: 'auto' }}>
           {jobs.length === 0 && <p className="muted" style={{ padding: 8 }}>{t('common.none')}</p>}

@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace darkstudio::datasets
 {
@@ -30,4 +31,7 @@ namespace darkstudio::datasets
 	Json::Value write_labels(const fs::path & root, const std::string & image, const Json::Value & boxes);
 
 	bool is_image(const fs::path & p);
+
+	/// Class names for a folder: the first *.names file in the folder or one of its parents (up to @p root).
+	std::vector<std::string> find_names(const fs::path & folder, const fs::path & root);
 }

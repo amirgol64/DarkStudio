@@ -6,10 +6,12 @@ The first slice of the DarkStudio app: a local C++ server plus a web UI. Use it 
 |---|---|
 | **Devices** | CPU, RAM, and each backend: Darknet CPU, Darknet SYCL (Intel GPU), OpenVINO devices. Versions, availability, probe output and errors, plus the files the jobs need |
 | **Benchmarks** | Run the OpenVINO benchmark (GPU/CPU, FP16/FP32) or the Darknet CPU-vs-SYCL check. Results table, ms-per-image chart, per-image detections, annotated images |
-| **Training** | Prepare LEGO Gears, start or stop training on the Iris Xe or the CPU, a **live loss / average loss / mAP chart**, seconds per iteration, time remaining, one-click mAP evaluation |
+| **Training** | **Normal** mode: pick a labeled `datasets/` folder, a model (YOLOv4-tiny, YOLOv4-tiny-3L, YOLOv7-tiny), image size, iterations and device. The server writes `.data`, `.names`, train/valid lists and `.cfg`, and prepares the pretrained partial weights. **Advanced** mode adds width/height, batch, subdivisions, learning rate, validation %, pretrained on/off, a custom weights file, augmentation (mosaic, flip, hue, saturation, exposure, angle), and your own `.data`/`.cfg`. Start or stop on the Iris Xe or the CPU, a **live loss / average loss / mAP chart**, seconds per iteration, time remaining, one-click mAP evaluation, Prepare LEGO Gears |
 | **Logs & errors** | Every job's output, live. Errors and warnings are highlighted and filterable, with search |
 | **Annotation** | YOLO boxes on images in `datasets/`. Draw, move, resize, delete and change class. It saves Darknet `.txt` labels next to the images |
 | **Settings** | Tool paths, default OpenVINO device and precision, the OpenVINO model cache, theme (system/light/dark), language (English / Hebrew RTL) |
+
+**In-app help:** every page has a foldable **How to use this page** panel. It is open by default (folded on Annotation), and the browser remembers the choice per page. The training options have a **?** with a short tip and a link to the matching section of [how_to_use.md](how_to_use.md). All help text is in English and Hebrew.
 
 ## Run it
 
@@ -38,7 +40,7 @@ Build and test:
 ```powershell
 cmake -S server -B server/build -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE=C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake
 cmake --build server/build --config Release
-server\build\Release\darkstudio-tests.exe      # 65 checks: parsers (real tool output) + dataset path safety
+server\build\Release\darkstudio-tests.exe      # 127 checks: parsers (real tool output), dataset path safety, cfg generation, train/valid split, training setup
 cd web; npm run lint; npm run build
 ```
 
@@ -62,6 +64,7 @@ Browser (React + TS, Vite)  ──REST /api/*──►  darkstudio-server (C++20
 | `parsers.*` | Turn Darknet, ov-bench and compare output into JSON (training iterations, mAP, benchmark numbers). Log lines are classified as info, warning or error |
 | `system_info.*` | Probes `darknet --version` (CPU and SYCL) and `ov-bench --list-devices`, plus CPU and RAM |
 | `datasets.*` | Lists folders and images, and reads/writes YOLO labels. **Every path is resolved and must stay inside `datasets/`** |
+| `training.*` | The built-in model list, trainable folders (counts include sub-folders), and the training setup: train/valid split, `.data`, `.names`, the `.cfg` rewrite (size, iterations, burn_in, steps, augmentation, `classes`, `filters=(classes+5)×masks`), label class checks, and `darknet partial` for the pretrained weights |
 | `events.*` | WebSocket broadcast |
 
 ### REST API
@@ -74,8 +77,10 @@ Browser (React + TS, Vite)  ──REST /api/*──►  darkstudio-server (C++20
 | `GET /api/jobs`, `POST /api/jobs` `{kind, params}` | List / start. Returns **409** while another job runs and **400** for invalid parameters |
 | `GET /api/jobs/{id}`, `GET …/log?since=N`, `GET …/metrics`, `POST …/stop`, `GET …/image?name=` | One job: summary, log lines, training metrics, stop, annotated benchmark image |
 | `GET /api/datasets`, `GET …/images?folder=`, `GET …/file?path=`, `GET/PUT …/labels?image=` | Annotation |
+| `GET /api/training/models` | Base models and what is available on this machine: cfg, COCO weights, partial weights, download URL, license |
+| `GET /api/training/datasets` | Folders with labeled images (including sub-folders) and their class names |
 
-Job kinds: `ov-bench` {device, precision, iterations} · `compare-cpu-sycl` {repeat} · `prepare-legogears` {max_batches} · `train` {backend: sycl|cpu, data, cfg, weights?, map} · `map` {backend, data, cfg, weights, iou}.
+Job kinds: `ov-bench` {device, precision, iterations} · `compare-cpu-sycl` {repeat} · `prepare-legogears` {max_batches} · `train` {backend: sycl|cpu, map, **dataset**, model, width, height, max_batches, batch?, subdivisions?, valid_percent?, pretrained?, learning_rate?, mosaic?, flip?, hue?, saturation?, exposure?, angle?, weights?} (generated files) or {backend, data, cfg, weights?, map} (own files) · `map` {backend, data, cfg, weights, iou}.
 
 WebSocket `/ws/events` messages: `{"type":"job","job":{…}}`, `{"type":"log","job_id","n","line","level"}`, `{"type":"metric","job_id","metric":{…}}`, `{"type":"system","system":{…}}`.
 
@@ -97,9 +102,16 @@ All are MIT: React, React Router, i18next / react-i18next, Recharts, Konva / rea
 - A second job while busy returns 409. Invalid parameters return 400. Job history survives a server restart.
 - Screenshots of every page in dark theme, and Hebrew RTL, checked with headless Edge.
 
+## Tested: training setup (2026-10-12)
+
+- `legogears/LegoGears_v2` with YOLOv4-tiny, 224×160, 60 iterations on the Iris Xe through the API in dataset mode: 81 training / 9 validation images, 5 classes. The generated cfg had `filters=30`, `steps=48,54`, `burn_in=12` and `mosaic=0`, and the run started from the pretrained `yolov4-tiny.conv.29`. The run succeeded (~1.8 s per iteration), and **Evaluate mAP** on the generated `.data`/`.cfg` succeeded too.
+- Screenshots of the Training page in Normal (English) and Advanced (Hebrew RTL) mode, checked with headless Edge.
+
 ## Known limitations / next
 
 - **Job titles are generated by the server in English** (the UI text itself is translated).
+- YOLOv7-tiny has no pretrained start yet (it trains from scratch). Anchors aren't recalculated for your dataset yet (`darknet detector calc_anchors`).
+- The **?** links open the guide on GitHub, so they need internet access.
 - The **annotation view handles boxes only**. Polygons, the SAM2 assist and review states come in M1/M4.
 - Settings and job history are JSON files. SQLite (already in the Drogon build) arrives with M1's projects and datasets.
 - Single user and localhost only (see Security).

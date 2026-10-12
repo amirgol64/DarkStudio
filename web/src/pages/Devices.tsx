@@ -3,7 +3,7 @@
 import { useTranslation } from 'react-i18next'
 import { formatBytes, type Backend } from '../api'
 import { useStore, refreshSystem } from '../store'
-import { ErrorText } from '../components'
+import { ErrorText, PageHelp } from '../components'
 import { useAction } from '../util'
 
 function BackendCard({ b }: { b: Backend }) {
@@ -81,6 +81,7 @@ export default function Devices() {
           {t('devices.reprobe')}
         </button>
       </div>
+      <PageHelp page="devices" anchor="#2-check-your-machine-devices" />
       <ErrorText error={action.error} />
 
       {system.cpu && (

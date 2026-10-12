@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api, type Job } from '../api'
 import { sortJobs, upsertJob, useStore } from '../store'
-import { ErrorText, LogView, Progress, StatusBadge } from '../components'
+import { ErrorText, LogView, PageHelp, Progress, StatusBadge } from '../components'
 import { duration, useAction } from '../util'
 
 const fmt = (v: unknown, digits = 1) => (typeof v === 'number' ? v.toFixed(digits) : '–')
@@ -115,6 +115,7 @@ export default function Benchmarks() {
   return (
     <div className="stack">
       <div className="page-head"><h1>{t('nav.benchmarks')}</h1></div>
+      <PageHelp page="benchmarks" anchor="#3-try-it-out-benchmarks-and-the-lego-gears-training-demo" />
       <ErrorText error={action.error} />
 
       <div className="grid">

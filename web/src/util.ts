@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import type { Job } from './api'
 
+/** The user guide (docs/how_to_use.md); help links add a heading anchor such as "#43-start-a-training-run-normal". */
+export const GUIDE_URL = 'https://github.com/amirgol64/DarkStudio/blob/main/docs/how_to_use.md'
+
 export function applyTheme(theme: string) {
   if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme
   else delete document.documentElement.dataset.theme
