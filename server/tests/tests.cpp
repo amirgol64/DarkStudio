@@ -4,6 +4,7 @@
 // The sample lines are real output captured from Darknet, ov-bench and compare-cpu-sycl.ps1 on 2026-10-09.
 
 #include "datasets.hpp"
+#include "files.hpp"
 #include "parsers.hpp"
 #include "training.hpp"
 
@@ -325,6 +326,32 @@ namespace
 		CHECK(cfg_value(cfg.str(), "net", 0, "max_batches") == "100");
 		CHECK(cfg_value(cfg.str(), "yolo", 0, "classes") == "2");
 
+		// the same folder as an absolute path (as picked in the file browser), and its info
+		Json::Value abs = p;
+		abs["dataset"] = std::string(reinterpret_cast<const char *>((s.datasets_dir / "my set").u8string().c_str()));
+		fs::create_directories(base / "job2");
+		CHECK(training::prepare(s, abs, base / "job2").train_images == 8);
+		const auto info = training::dataset_info(s, abs["dataset"].asString());
+		CHECK(info["labeled"].asInt() == 10);
+		CHECK(info["with_boxes"].asInt() == 10);
+		CHECK(info["names"].size() == 2);
+		CHECK(training::dataset_info(s, "my set/sub")["names"].size() == 2);
+
+		// a folder outside datasets/ with its own .names file
+		const fs::path outside = base / "elsewhere" / "set";
+		fs::create_directories(outside);
+		std::ofstream(outside / "o.names") << "a\nb\nc\n";
+		std::ofstream(outside / "x1.jpg") << "x";
+		std::ofstream(outside / "x1.txt") << "2 0.5 0.5 0.1 0.1\n";
+		std::ofstream(outside / "x2.jpg") << "x";
+		std::ofstream(outside / "x2.txt") << "";
+		Json::Value out = p;
+		out["dataset"] = std::string(reinterpret_cast<const char *>(outside.u8string().c_str()));
+		fs::create_directories(base / "job3");
+		const auto r3 = training::prepare(s, out, base / "job3");
+		CHECK(r3.classes == 3);
+		CHECK(r3.train_images + r3.valid_images >= 2);
+
 		auto expect_error = [&](Json::Value q)
 		{
 			bool rejected = false;
@@ -337,6 +364,51 @@ namespace
 		q = p; q["batch"] = 64; q["subdivisions"] = 3;				expect_error(q);
 		std::ofstream(set / "sub" / "i0.txt") << "7 0.5 0.5 0.1 0.1\n";		// class 7 is not in the names file
 		expect_error(p);
+
+		std::error_code ec;
+		fs::remove_all(base, ec);
+	}
+
+	void test_files()
+	{
+		namespace fs = std::filesystem;
+		const fs::path base = fs::temp_directory_path() / "darkstudio-tests-files";
+		fs::remove_all(base);
+		fs::create_directories(base / "Zeta");
+		fs::create_directories(base / "alpha");
+		fs::create_directories(base / ".hidden");
+		std::ofstream(base / "b.cfg") << "[net]";
+		std::ofstream(base / "a.jpg") << "x";
+		std::ofstream(base / "a.txt") << "";
+		std::ofstream(base / "c.jpg") << "x";
+		std::ofstream(base / "my.names") << "x\n";
+
+		Settings s;
+		s.root = DARKSTUDIO_ROOT;
+		const auto j = files::list(s, std::string(reinterpret_cast<const char *>(base.u8string().c_str())));
+		const auto & e = j["entries"];
+		CHECK(e.size() == 7);						// .hidden is skipped
+		CHECK(e[0]["name"].asString() == "alpha");	// folders first, sorted without case
+		CHECK(e[0]["dir"].asBool());
+		CHECK(e[1]["name"].asString() == "Zeta");
+		CHECK(e[2]["name"].asString() == "a.jpg");
+		CHECK(not e[2]["dir"].asBool());
+		CHECK(j["summary"]["images"].asInt() == 2);
+		CHECK(j["summary"]["labeled"].asInt() == 1);
+		CHECK(j["summary"]["names"].size() == 1);
+		CHECK(not j["parent"].asString().empty());
+
+		CHECK(not files::list(s, "")["entries"].empty());	// drives (or "/")
+
+		auto expect_error = [&](const std::string & path)
+		{
+			bool rejected = false;
+			try { files::list(s, path); } catch (const std::invalid_argument &) { rejected = true; }
+			CHECK(rejected);
+		};
+		expect_error("relative/path");
+		expect_error(std::string(reinterpret_cast<const char *>((base / "missing").u8string().c_str())));
+		expect_error(std::string(reinterpret_cast<const char *>((base / "b.cfg").u8string().c_str())));
 
 		std::error_code ec;
 		fs::remove_all(base, ec);
@@ -398,6 +470,7 @@ int main()
 	test_openvino_devices();
 	test_strip_ansi();
 	test_datasets();
+	test_files();
 	test_make_cfg();
 	test_split();
 	try

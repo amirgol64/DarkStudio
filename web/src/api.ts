@@ -113,6 +113,31 @@ export interface TrainingDataset {
   names: string[]
 }
 
+export interface FileEntry {
+  name: string
+  path: string
+  dir: boolean
+  size: number
+}
+
+/** One folder from the server's file browser (server/src/files.cpp).  path "" = the list of drives. */
+export interface FileListing {
+  path: string
+  parent: string
+  entries: FileEntry[]
+  truncated?: boolean
+  summary?: { images: number; labeled: number; names: string[] }
+  shortcuts: { id: string; path: string }[]
+}
+
+/** What a dataset folder holds, counting sub-folders. */
+export interface DatasetInfo {
+  path: string
+  labeled: number
+  with_boxes: number
+  names: string[]
+}
+
 export interface DatasetImage {
   path: string
   name: string
@@ -165,6 +190,8 @@ export const api = {
   jobMetrics: (id: string) => request<TrainingMetric[]>('GET', `/api/jobs/${q(id)}/metrics`),
   jobImageUrl: (id: string, name: string) => `/api/jobs/${q(id)}/image?name=${q(name)}`,
   trainingDatasets: () => request<TrainingDataset[]>('GET', '/api/training/datasets'),
+  datasetInfo: (path: string) => request<DatasetInfo>('GET', `/api/training/dataset-info?path=${q(path)}`),
+  files: (path: string) => request<FileListing>('GET', `/api/files?path=${q(path)}`),
   trainingModels: () => request<TrainingModel[]>('GET', '/api/training/models'),
   datasets: () => request<DatasetFolder[]>('GET', '/api/datasets'),
   datasetImages: (folder: string) =>

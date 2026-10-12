@@ -62,7 +62,7 @@ Every field on the Training page has a small **?** next to it. Click it for a sh
 
 ### 4.1 Put your images in `datasets/`
 
-Create a folder for the project, for example `datasets/fruit/`, and copy your images into it (`.jpg`, `.png` or `.bmp`; sub-folders are fine). The Annotation and Training pages only see folders inside `datasets/`.
+Create a folder for the project, for example `datasets/fruit/`, and copy your images into it (`.jpg`, `.png` or `.bmp`; sub-folders are fine). The Annotation page only sees folders inside `datasets/`. The Training page can also train a folder anywhere on your PC (pick it with **Browse…**), but keeping datasets in `datasets/` lets you label them in the app too.
 
 Add a **class names file** in that folder, one class per line, for example `datasets/fruit/fruit.names`:
 
@@ -95,12 +95,24 @@ In **Training → New training run**, keep **Normal** selected:
 
 | Field | What to choose |
 |---|---|
-| **Dataset folder** | Your folder, for example `fruit`. Below the field, the page shows the number of labeled images (including sub-folders) and the class names it found |
+| **Dataset folder** | Your folder. Type it (for example `fruit`, relative to `datasets/`), pick a suggestion from the list, or press **Browse…** to choose any folder (see [Choosing folders and files](#choosing-folders-and-files)). Below the field, the page shows the number of labeled images (including sub-folders) and the class names it found |
 | **Model** | **YOLOv4-tiny** to start. See [4.4](#44-choose-the-model-and-pretrained-weights) |
 | **Image size** | The network input size. Every image is resized to it. 416 × 416 is a good default. Smaller is faster, larger finds small objects better |
 | **Iterations** | How many training steps. It starts at Darknet's suggestion (2000 per class, at least 6000). For a first test, a few hundred is enough to see whether the loss goes down. The page shows the seconds per iteration and the time left once a run starts |
 | **Device** | **Intel GPU (SYCL)**. It is about 27× faster than the CPU on the Iris Xe |
 | **Calculate mAP during training** | Leave it on. Darknet then checks the validation images regularly and keeps the best model as `*_best.weights` |
+
+#### Choosing folders and files
+
+Every path on the Training page (the dataset folder, a weights file, and your own `.data` and `.cfg` files) has a **Browse…** button. It opens a window that lists the folders and files on this PC:
+
+- Click a folder to open it. **↑** goes up one folder, and **This PC** lists the drives. You can also type or paste a path and press **Go**.
+- The buttons under the path jump to the **Datasets**, **Models**, **Training runs** and **DarkStudio** folders, and to your **Home** folder.
+- For a folder: open it and press **Select this folder**. The bottom line shows how many images are directly in the open folder, how many are labeled, and any `.names` file there.
+- For a file: only matching files are listed (for example `.cfg`), unless you tick **Show all files**. Click a file and press **Select**, or double-click it.
+- The window opens at the field's current path, or else at the last folder you used for that kind of file.
+
+(A web page can't read real paths from Windows' own file dialog, so DarkStudio's server lists the folders instead. It only lists names and never sends file contents.)
 
 Press **Start**. DarkStudio then writes these files into the run's folder (`build/darkstudio/jobs/<run id>/`):
 
@@ -145,7 +157,7 @@ Click **Advanced** at the top of the card to see more options. The page remember
 
 ### 4.6 Use your own `.data` and `.cfg` files
 
-For full control, in **Advanced** tick **Use my own .data and .cfg files** and enter their paths, plus an optional weights file. DarkStudio copies them into the run folder and doesn't change them, except that `backup` points to the run folder. Leave the paths empty to use the LEGO Gears demo files.
+For full control, in **Advanced** tick **Use my own .data and .cfg files** and enter their paths (or pick them with **Browse…**), plus an optional weights file. DarkStudio copies them into the run folder and doesn't change them, except that `backup` points to the run folder. Leave the paths empty to use the LEGO Gears demo files.
 
 To write them by hand:
 

@@ -7,6 +7,7 @@
 
 #include "datasets.hpp"
 #include "events.hpp"
+#include "files.hpp"
 #include "jobs.hpp"
 #include "settings.hpp"
 #include "system_info.hpp"
@@ -249,6 +250,17 @@ int main(int argc, char * argv[])
 		app().registerHandler("/api/training/datasets", [settings](const HttpRequestPtr &, Callback && cb)
 		{
 			guarded(cb, [&] { return json_response(darkstudio::training::datasets_json(settings->get().datasets_dir)); });
+		}, {Get});
+
+		app().registerHandler("/api/training/dataset-info", [settings](const HttpRequestPtr & req, Callback && cb)
+		{
+			guarded(cb, [&] { return json_response(darkstudio::training::dataset_info(settings->get(), req->getParameter("path"))); });
+		}, {Get});
+
+		// --- file browser for the "Browse…" window (names only, localhost only) ---
+		app().registerHandler("/api/files", [settings](const HttpRequestPtr & req, Callback && cb)
+		{
+			guarded(cb, [&] { return json_response(darkstudio::files::list(settings->get(), req->getParameter("path"))); });
 		}, {Get});
 
 		// --- datasets / annotation ---

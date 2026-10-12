@@ -4,9 +4,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis } from 'recharts'
-import { api, type Job, type TrainingDataset, type TrainingMetric, type TrainingModel } from '../api'
+import { api, type DatasetInfo, type Job, type TrainingDataset, type TrainingMetric, type TrainingModel } from '../api'
 import { EMPTY_LIST, ensureMetrics, sortJobs, upsertJob, useStore } from '../store'
 import { ErrorText, Help, LogView, PageHelp, Progress, StatusBadge } from '../components'
+import { PathField } from '../FileBrowser'
 import { duration, useAction } from '../util'
 
 function TrainingChart({ job }: { job: Job }) {
@@ -156,7 +157,26 @@ function NewTrainingRun({ disabled, onStart }: { disabled: boolean; onStart: (pa
 
   const advanced = mode === 'advanced'
   const isManual = advanced && manual
-  const current = datasets.find((d) => d.path === dataset)
+  const [current, setCurrent] = useState<DatasetInfo | null>(null)
+  const [datasetError, setDatasetError] = useState<string | null>(null)
+  useEffect(() => {
+    const path = dataset.trim()
+    let cancelled = false
+    const timer = setTimeout(() => {
+      if (!path) {
+        setCurrent(null)
+        setDatasetError(null)
+        return
+      }
+      api.datasetInfo(path)
+        .then((info) => { if (!cancelled) { setCurrent(info); setDatasetError(null) } })
+        .catch((e) => { if (!cancelled) { setCurrent(null); setDatasetError(e instanceof Error ? e.message : String(e)) } })
+    }, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [dataset])
   const model = models.find((m) => m.id === modelId)
   const classes = current?.names.length ?? 0
   const suggested = Math.max(6000, 2000 * classes)
@@ -206,12 +226,11 @@ function NewTrainingRun({ disabled, onStart }: { disabled: boolean; onStart: (pa
           <div className="form-grid">
             <label className="field">
               <span>{t('train.dataset')}<Help text={t('train.tips.dataset')} anchor="#41-put-your-images-in-datasets" /></span>
-              <select value={dataset} onChange={(e) => { setDataset(e.target.value); setIterations(null) }}>
-                {!current && <option value="">{t('train.choose')}</option>}
-                {datasets.map((d) => (
-                  <option key={d.path} value={d.path}>{d.path}</option>
-                ))}
-              </select>
+              <PathField mode="dir" kind="dataset" start="datasets" title={t('files.titleDataset')} list="train-datasets"
+                placeholder={t('train.choose')} value={dataset} onChange={(v) => { setDataset(v); setIterations(null) }} />
+              <datalist id="train-datasets">
+                {datasets.map((d) => <option key={d.path} value={d.path} />)}
+              </datalist>
             </label>
             <label className="field">
               <span>{t('train.model')}<Help text={t('train.tips.model')} anchor="#44-choose-the-model-and-pretrained-weights" /></span>
@@ -220,7 +239,8 @@ function NewTrainingRun({ disabled, onStart }: { disabled: boolean; onStart: (pa
               </select>
             </label>
           </div>
-          {datasets.length === 0 && !loadError && <p className="muted">{t('train.noDatasets')}</p>}
+          {datasets.length === 0 && !loadError && !dataset && <p className="muted">{t('train.noDatasets')}</p>}
+          <ErrorText error={datasetError} />
           {current && (
             <p className="muted">
               {t('train.datasetInfo', { images: current.labeled, classes })}
@@ -296,7 +316,8 @@ function NewTrainingRun({ disabled, onStart }: { disabled: boolean; onStart: (pa
                 </label>
                 <label className="field" style={{ marginBottom: 12 }}>
                   <span>{t('train.customWeights')}<Help text={t('train.tips.customWeights')} anchor="#44-choose-the-model-and-pretrained-weights" /></span>
-                  <input type="text" dir="ltr" className="mono" value={customWeights} onChange={(e) => setCustomWeights(e.target.value)} />
+                  <PathField mode="file" kind="weights" start="models" title={t('files.titleWeights')} accept={['.weights', '.conv.']}
+                    value={customWeights} onChange={setCustomWeights} />
                 </label>
               </fieldset>
 
@@ -320,9 +341,18 @@ function NewTrainingRun({ disabled, onStart }: { disabled: boolean; onStart: (pa
 
       {isManual && (
         <div className="stack" style={{ gap: 8, marginBottom: 12 }}>
-          <label className="field">{t('train.data')}<input type="text" dir="ltr" className="mono" placeholder="build/train-test/legogears/LegoGears.data" value={data} onChange={(e) => setData(e.target.value)} /></label>
-          <label className="field">{t('train.cfg')}<input type="text" dir="ltr" className="mono" placeholder="build/train-test/legogears/LegoGears.cfg" value={cfg} onChange={(e) => setCfg(e.target.value)} /></label>
-          <label className="field">{t('train.weights')}<input type="text" dir="ltr" className="mono" value={weights} onChange={(e) => setWeights(e.target.value)} /></label>
+          <label className="field">{t('train.data')}
+            <PathField mode="file" kind="data" start="datasets" title={t('files.titleData')} accept={['.data']}
+              placeholder="build/train-test/legogears/LegoGears.data" value={data} onChange={setData} />
+          </label>
+          <label className="field">{t('train.cfg')}
+            <PathField mode="file" kind="cfg" start="datasets" title={t('files.titleCfg')} accept={['.cfg']}
+              placeholder="build/train-test/legogears/LegoGears.cfg" value={cfg} onChange={setCfg} />
+          </label>
+          <label className="field">{t('train.weights')}
+            <PathField mode="file" kind="weights" start="models" title={t('files.titleWeights')} accept={['.weights', '.conv.']}
+              value={weights} onChange={setWeights} />
+          </label>
           <div className="form-grid">
             <label className="field">{t('train.backend')}
               <select value={backend} onChange={(e) => setBackend(e.target.value as 'sycl' | 'cpu')}>

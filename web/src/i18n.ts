@@ -43,7 +43,7 @@ const en = {
     modelMissing: 'COCO weights not downloaded:', modelScratch: 'No pretrained weights: trains from scratch and needs more data',
     generated: '{{train}} training / {{valid}} validation images · {{classes}} classes',
     tips: {
-      dataset: 'A folder in datasets/ with your images, their YOLO .txt labels and a .names file (one class per line). Only labeled images are used.',
+      dataset: 'The folder with your images, their YOLO .txt labels and a .names file (one class per line). Pick one from the list, type a path, or press Browse… to choose any folder on this PC. Only labeled images are used.',
       model: 'The network to train. YOLOv4-tiny is fast and a good start. YOLOv4-tiny-3L finds small objects better. YOLOv7-tiny has no pretrained weights here yet.',
       size: 'The network input size. Images are resized to it. Smaller is faster; larger finds small objects better. Must be a multiple of 32.',
       iterations: 'How many training steps (max_batches). Darknet suggests 2000 per class and at least 6000. Use a few hundred for a quick test.',
@@ -101,6 +101,15 @@ const en = {
       ],
     },
   },
+  files: {
+    browse: 'Browse…', close: 'Close', cancel: 'Cancel', up: 'Up one folder', go: 'Go', computer: 'This PC',
+    selectFolder: 'Select this folder', select: 'Select', showAll: 'Show all files', empty: 'No matching folders or files',
+    summary: '{{images}} images here · {{labeled}} labeled', names: 'class names: {{names}}',
+    truncated: 'Only the first 5000 entries are shown.',
+    shortcut: { datasets: 'Datasets', models: 'Models', runs: 'Training runs', root: 'DarkStudio', home: 'Home' },
+    titleDataset: 'Choose the dataset folder', titleData: 'Choose a .data file', titleCfg: 'Choose a .cfg file',
+    titleWeights: 'Choose a weights file',
+  },
   settings: {
     paths: 'Paths', defaults: 'Defaults', appearance: 'Appearance', language: 'Language', theme: 'Theme',
     system: 'System', light: 'Light', dark: 'Dark', cache: 'OpenVINO model cache (12.6 s → 0.12 s GPU startup)',
@@ -151,7 +160,7 @@ const he: typeof en = {
     modelMissing: 'משקולות COCO לא הורדו:', modelScratch: 'אין משקולות מאומנות מראש: האימון מתחיל מאפס ודורש יותר נתונים',
     generated: '{{train}} תמונות אימון / {{valid}} תמונות אימות · {{classes}} מחלקות',
     tips: {
-      dataset: 'תיקייה ב-datasets/ עם התמונות שלכם, קובצי התיוג (txt בפורמט YOLO) וקובץ names (מחלקה בכל שורה). רק תמונות מתויגות משמשות לאימון.',
+      dataset: 'התיקייה עם התמונות שלכם, קובצי התיוג (txt בפורמט YOLO) וקובץ names (מחלקה בכל שורה). בחרו מהרשימה, הקלידו נתיב או לחצו עיון… כדי לבחור כל תיקייה במחשב. רק תמונות מתויגות משמשות לאימון.',
       model: 'הרשת שתאומן. YOLOv4-tiny מהירה ומתאימה להתחלה. YOLOv4-tiny-3L מוצאת עצמים קטנים טוב יותר. ל-YOLOv7-tiny עדיין אין כאן משקולות מאומנות מראש.',
       size: 'גודל הקלט של הרשת; התמונות מוקטנות אליו. קטן יותר מהיר יותר, גדול יותר מוצא עצמים קטנים טוב יותר. חייב להיות כפולה של 32.',
       iterations: 'כמה צעדי אימון (max_batches). Darknet ממליץ על 2000 לכל מחלקה ולפחות 6000. לבדיקה מהירה מספיקות כמה מאות.',
@@ -208,6 +217,15 @@ const he: typeof en = {
         'לחצו "שמירה". ערכת הנושא והשפה מוחלות מיד.',
       ],
     },
+  },
+  files: {
+    browse: 'עיון…', close: 'סגירה', cancel: 'ביטול', up: 'תיקייה אחת למעלה', go: 'מעבר', computer: 'המחשב',
+    selectFolder: 'בחירת התיקייה הזו', select: 'בחירה', showAll: 'הצגת כל הקבצים', empty: 'אין תיקיות או קבצים מתאימים',
+    summary: '{{images}} תמונות כאן · {{labeled}} מתויגות', names: 'שמות מחלקות: {{names}}',
+    truncated: 'מוצגים רק 5000 הפריטים הראשונים.',
+    shortcut: { datasets: 'מאגרים', models: 'מודלים', runs: 'הרצות אימון', root: 'DarkStudio', home: 'בית' },
+    titleDataset: 'בחירת תיקיית המאגר', titleData: 'בחירת קובץ data', titleCfg: 'בחירת קובץ cfg',
+    titleWeights: 'בחירת קובץ משקולות',
   },
   settings: {
     paths: 'נתיבים', defaults: 'ברירות מחדל', appearance: 'מראה', language: 'שפה', theme: 'ערכת נושא',

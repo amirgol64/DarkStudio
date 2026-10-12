@@ -17,7 +17,7 @@ DarkStudio is a free, open-source computer-vision toolchain. It lets you label, 
 | `tools/train-test/` | Prepare a small dataset (LEGO Gears, local testing only, CC BY-NC-SA) for CPU vs Intel GPU training comparisons | Apache-2.0 |
 | `docs/` | [How to use](docs/how_to_use.md), [Windows build](docs/build-windows.md), [Intel GPU](docs/intel-gpu.md), [UI and API](docs/darkstudio-ui.md) | Apache-2.0 |
 | `server/` | C++20 backend (Drogon): REST + WebSocket, job runner for Darknet / OpenVINO / training, training setup (model list, `.data`/`.cfg` generation, pretrained weights), datasets API, unit tests. **v0** | Apache-2.0 |
-| `web/` | React + TypeScript web UI: Devices, Benchmarks, Training (Normal/Advanced setup from a labeled folder, live charts), Logs & errors, Annotation, Settings; in-app help (**?** tips, How to use panels); EN + HE (RTL). **v0** | Apache-2.0 |
+| `web/` | React + TypeScript web UI: Devices, Benchmarks, Training (Normal/Advanced setup from a labeled folder, live charts), Logs & errors, Annotation, Settings; a **Browse…** window to pick folders and files; in-app help (**?** tips, How to use panels); EN + HE (RTL). **v0** | Apache-2.0 |
 | `darkstudio.bat` | One command: build if needed, start the server, open the UI | Apache-2.0 |
 
 ## Hardware support

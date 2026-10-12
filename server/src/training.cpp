@@ -449,11 +449,71 @@ namespace darkstudio::training
 	}
 
 
+	DatasetFolder resolve_dataset(const Settings & s, const std::string & text)
+	{
+		if (text.empty())
+		{
+			throw std::invalid_argument("choose a dataset folder");
+		}
+		DatasetFolder d;
+		const fs::path p(std::u8string(text.begin(), text.end()));
+		if (p.is_absolute())
+		{
+			std::error_code ec;
+			d.folder = fs::weakly_canonical(p, ec);
+			const fs::path root = fs::weakly_canonical(s.datasets_dir, ec);
+			const auto rel = fs::relative(d.folder, root, ec);
+			const bool inside = not ec and not rel.empty() and *rel.begin() != "..";
+			d.names_root = inside ? root : d.folder.parent_path();
+		}
+		else
+		{
+			d.folder = datasets::resolve(s.datasets_dir, text);
+			d.names_root = s.datasets_dir;
+		}
+		if (not fs::is_directory(d.folder))
+		{
+			throw std::invalid_argument("dataset folder not found: " + text);
+		}
+		return d;
+	}
+
+
+	Json::Value dataset_info(const Settings & s, const std::string & text)
+	{
+		const auto d = resolve_dataset(s, text);
+		int labeled = 0;
+		int with_boxes = 0;
+		for (const auto & img : labeled_images(d.folder))
+		{
+			labeled ++;
+			std::error_code ec;
+			with_boxes += fs::file_size(fs::path(img).replace_extension(".txt"), ec) > 0 ? 1 : 0;
+		}
+		Json::Value j;
+		j["path"]		= utf8(fs::path(d.folder).make_preferred());
+		j["labeled"]	= labeled;
+		j["with_boxes"]	= with_boxes;
+		Json::Value names = Json::arrayValue;
+		for (const auto & n : datasets::find_names(d.folder, d.names_root))
+		{
+			names.append(n);
+		}
+		j["names"] = names;
+		return j;
+	}
+
+
 	std::vector<fs::path> labeled_images(const fs::path & folder)
 	{
 		std::vector<fs::path> out;
 		for (auto it = fs::recursive_directory_iterator(folder, fs::directory_options::skip_permission_denied); it != fs::recursive_directory_iterator(); ++ it)
 		{
+			if (it.depth() > 6)
+			{
+				it.disable_recursion_pending();
+				continue;
+			}
 			if (it->is_regular_file() and datasets::is_image(it->path()) and fs::exists(fs::path(it->path()).replace_extension(".txt")))
 			{
 				out.push_back(it->path());
@@ -479,17 +539,10 @@ namespace darkstudio::training
 		}
 
 		const std::string dataset = p.isMember("dataset") and p["dataset"].isString() ? p["dataset"].asString() : "";
-		if (dataset.empty())
-		{
-			throw std::invalid_argument("choose a dataset folder");
-		}
-		const fs::path folder = datasets::resolve(s.datasets_dir, dataset);
-		if (not fs::is_directory(folder))
-		{
-			throw std::invalid_argument("dataset folder not found: " + dataset);
-		}
+		const auto resolved = resolve_dataset(s, dataset);
+		const fs::path folder = resolved.folder;
 
-		const auto names = datasets::find_names(folder, s.datasets_dir);
+		const auto names = datasets::find_names(folder, resolved.names_root);
 		if (names.empty())
 		{
 			throw std::invalid_argument("no .names file in " + dataset + " or its parent folders: add one with a class name per line (see docs/how_to_use.md)");

@@ -151,6 +151,32 @@ label.field > span:first-child { display: flex; align-items: center; min-height:
 fieldset.group { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px 0; margin: 0 0 12px; min-width: 0; }
 fieldset.group legend { padding: 0 6px; font-size: 12px; color: var(--muted); }
 
+/* file browser window */
+.path-field { display: flex; gap: 6px; min-width: 0; }
+.path-field input { flex: 1; min-width: 0; }
+.modal-backdrop { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 0.45); display: grid; place-items: center; padding: 16px; }
+.modal {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.35); padding: 16px; width: min(760px, 100%); max-height: calc(100vh - 32px);
+  display: flex; flex-direction: column; outline: none; font-size: 14px;
+}
+.path-bar { flex-wrap: nowrap; margin-bottom: 8px; }
+.path-bar input { flex: 1; }
+.shortcuts { gap: 6px; margin-bottom: 8px; }
+.chip { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 14px; padding: 2px 10px; font-size: 12px; }
+.chip.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.file-list { border: 1px solid var(--border); border-radius: 8px; overflow: auto; min-height: 240px; height: 50vh; padding: 4px; }
+.file-list[aria-busy='true'] { opacity: 0.6; }
+.file-row {
+  display: flex; align-items: center; gap: 8px; width: 100%; background: transparent; color: var(--text);
+  border-radius: 6px; padding: 4px 8px; text-align: start;
+}
+.file-row:hover { background: var(--surface-2); }
+.file-row.active { background: var(--accent); color: var(--accent-text); }
+.file-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; }
+.file-row .size { font-size: 12px; }
+.file-row.active .size { color: inherit; }
+
 /* tables */
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: start; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -174,8 +200,9 @@ tr.clickable:hover, tr.selected { background: var(--surface-2); }
 .stat span { font-size: 12px; color: var(--muted); }
 
 /* annotation */
-.annot { display: grid; grid-template-columns: 240px 1fr 220px; gap: 14px; height: calc(100vh - 120px); min-height: 480px; }
-.annot .list { overflow: auto; }
+.annot { display: grid; grid-template-columns: 240px 1fr 220px; grid-template-rows: minmax(0, 1fr); gap: 14px; height: calc(100vh - 120px); min-height: 480px; }
+/* long image/class lists (e.g. ~100 traffic-sign classes) scroll inside their panel instead of stretching the canvas */
+.annot .list, .annot .classes { overflow: auto; }
 .annot .list button { display: flex; width: 100%; justify-content: space-between; gap: 8px; background: none; color: var(--text); border-radius: 6px; padding: 5px 8px; text-align: start; }
 .annot .list button.active { background: var(--accent); color: var(--accent-text); }
 .annot .canvas { background: var(--surface-2); border-radius: var(--radius); overflow: hidden; position: relative; direction: ltr; }
@@ -189,6 +216,7 @@ tr.clickable:hover, tr.selected { background: var(--surface-2); }
   .brand, .sidebar .footer { display: none; }
   .nav { display: flex; gap: 4px; }
   .main { padding: 16px; }
-  .annot { grid-template-columns: 1fr; height: auto; }
+  .annot { grid-template-columns: 1fr; grid-template-rows: none; height: auto; }
+  .annot .list, .annot .classes { max-height: 40vh; }
   .annot .canvas { height: 60vh; }
 }

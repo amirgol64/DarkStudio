@@ -247,6 +247,7 @@ Decided 2026-10-09: build the first slice of the **real** app (Drogon C++ server
 - [x] **Live training** view: prepare dataset, start/stop on SYCL or CPU, a live loss / average loss / mAP chart, s/iteration, remaining time, and a one-click mAP evaluation. (GPU memory isn't shown yet; it needs Level Zero Sysman.)
 - [x] **Logs & errors** view: all jobs, live log, errors and warnings highlighted, problems-only filter, search, follow. The sidebar badge counts failed jobs.
 - [x] **Annotation** view (first version of the M1 canvas, Konva): YOLO boxes on any `datasets/` folder, draw/move/resize/delete, class keys 1–9, ←/→, Ctrl+S, and auto-save on image change. **Polygons are deferred to M1.**
+- [x] Annotation view handles big datasets (e.g. `TSR`: 1,472 PNGs, ~100 classes): the image and class lists scroll inside their panels, so the canvas no longer grows past the screen and hides the image.
 - [x] **Settings** view: all tool paths, the default OpenVINO device and precision, the model cache, theme and language (saved on the server; browsers without their own choice follow it).
 - [x] `darkstudio.bat`: one command that builds the server and UI if needed, then starts and opens the browser.
 - [x] End-to-end test: API jobs (OpenVINO 10.5 ms/95 FPS on Iris Xe, SYCL training with live metrics), 409/400 handling, history after restart, and headless-Edge screenshots of every page (dark + Hebrew RTL).
@@ -255,6 +256,7 @@ Decided 2026-10-09: build the first slice of the **real** app (Drogon C++ server
 - [x] Built-in model list: YOLOv4-tiny and YOLOv4-tiny-3L (COCO partial weights), YOLOv7-tiny (from scratch). Shows whether the weights are ready, will be prepared, or are missing.
 - [x] Training tab **Normal / Advanced**. Normal: dataset, model, image size, iterations (Darknet's suggestion), device, mAP. Advanced: width/height, batch, subdivisions, learning rate, validation %, pretrained on/off, custom weights, augmentation (mosaic, flip, hue, saturation, exposure, angle), own `.data`/`.cfg`. The choice is remembered.
 - [x] In-app help: a **?** tip on every training option, with a link to the guide section, and a foldable "How to use this page" panel on every page (EN + HE).
+- [x] **Browse…** window for every training path (dataset folder, weights, own `.data`/`.cfg`): server file listing `GET /api/files` (names only, drives, shortcuts, image summary) and `GET /api/training/dataset-info`. Dataset folders can be anywhere on the PC (absolute paths). EN + HE, 21 new unit checks.
 - [ ] Anchor recalculation for the dataset (`darknet detector calc_anchors`) in Advanced.
 - [ ] Pretrained start for YOLOv7-tiny (find the right weights and partial layer count).
 - [ ] Serve the guide from the local server so the **?** links work offline.
@@ -309,6 +311,7 @@ This is the biggest research item. Code lives in `darknet/src-lib/`.
 
 ### M5 — Multi-user and collaboration (weeks 44–49)
 - [ ] PostgreSQL backend (same ORM models), plus S3/MinIO storage as an option.
+- [ ] Restrict the file browser (`/api/files`) and absolute dataset paths to allowed roots per user.
 - [ ] Roles (admin, annotator, reviewer). Task assignment and a review queue with accept, reject and comment.
 - [ ] Audit log and per-user stats.
 - [ ] Docker Compose (server, Postgres, MinIO, GPU worker) and Helm as a later option.

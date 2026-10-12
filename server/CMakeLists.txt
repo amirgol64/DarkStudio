@@ -16,6 +16,7 @@ FIND_PACKAGE (Drogon CONFIG REQUIRED)
 ADD_LIBRARY (darkstudio_core STATIC
 	src/datasets.cpp
 	src/events.cpp
+	src/files.cpp
 	src/jobs.cpp
 	src/parsers.cpp
 	src/process.cpp

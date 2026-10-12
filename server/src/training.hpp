@@ -70,6 +70,19 @@ namespace darkstudio::training
 	/// [{path, labeled, with_boxes, names}], with counts that include the sub-folders.
 	Json::Value datasets_json(const fs::path & datasets_root);
 
+	/// A dataset folder from the UI: a path relative to the datasets folder (checked to stay inside it), or an absolute
+	/// path anywhere (picked with the file browser).  @p names_root is where the .names search stops: the datasets
+	/// folder, or the parent of an outside folder.  Throws std::invalid_argument if it isn't a folder.
+	struct DatasetFolder
+	{
+		fs::path folder;
+		fs::path names_root;
+	};
+	DatasetFolder resolve_dataset(const Settings & s, const std::string & text);
+
+	/// What a dataset folder holds, counting sub-folders: {path, labeled, with_boxes, names}.
+	Json::Value dataset_info(const Settings & s, const std::string & text);
+
 	/// Labeled images (with a .txt file next to them) below @p folder, sorted.
 	std::vector<fs::path> labeled_images(const fs::path & folder);
 

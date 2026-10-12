@@ -11,6 +11,8 @@ The first slice of the DarkStudio app: a local C++ server plus a web UI. Use it 
 | **Annotation** | YOLO boxes on images in `datasets/`. Draw, move, resize, delete and change class. It saves Darknet `.txt` labels next to the images |
 | **Settings** | Tool paths, default OpenVINO device and precision, the OpenVINO model cache, theme (system/light/dark), language (English / Hebrew RTL) |
 
+**Browse… window:** every training path (dataset folder, weights, own `.data`/`.cfg`) has a **Browse…** button that opens a folder/file picker (`web/src/FileBrowser.tsx`, `GET /api/files`). It has drives, shortcuts (datasets, models, training runs, DarkStudio, home), an editable path, an extension filter with "show all", and a summary of the images and `.names` files in the open folder. It opens at the field's path or the last folder used for that kind. Dataset folders may now be absolute paths outside `datasets/`.
+
 **In-app help:** every page has a foldable **How to use this page** panel. It is open by default (folded on Annotation), and the browser remembers the choice per page. The training options have a **?** with a short tip and a link to the matching section of [how_to_use.md](how_to_use.md). All help text is in English and Hebrew.
 
 ## Run it
@@ -40,7 +42,7 @@ Build and test:
 ```powershell
 cmake -S server -B server/build -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE=C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake
 cmake --build server/build --config Release
-server\build\Release\darkstudio-tests.exe      # 127 checks: parsers (real tool output), dataset path safety, cfg generation, train/valid split, training setup
+server\build\Release\darkstudio-tests.exe      # 148 checks: parsers (real tool output), dataset path safety, cfg generation, train/valid split, training setup, file browser
 cd web; npm run lint; npm run build
 ```
 
@@ -64,6 +66,7 @@ Browser (React + TS, Vite)  ──REST /api/*──►  darkstudio-server (C++20
 | `parsers.*` | Turn Darknet, ov-bench and compare output into JSON (training iterations, mAP, benchmark numbers). Log lines are classified as info, warning or error |
 | `system_info.*` | Probes `darknet --version` (CPU and SYCL) and `ov-bench --list-devices`, plus CPU and RAM |
 | `datasets.*` | Lists folders and images, and reads/writes YOLO labels. **Every path is resolved and must stay inside `datasets/`** |
+| `files.*` | The file browser: lists one folder (names, sizes, folders first, hidden/system entries skipped, max 5000), the drives, shortcuts, and an image/label/`.names` summary. Names only, never contents |
 | `training.*` | The built-in model list, trainable folders (counts include sub-folders), and the training setup: train/valid split, `.data`, `.names`, the `.cfg` rewrite (size, iterations, burn_in, steps, augmentation, `classes`, `filters=(classes+5)×masks`), label class checks, and `darknet partial` for the pretrained weights |
 | `events.*` | WebSocket broadcast |
 
@@ -79,6 +82,8 @@ Browser (React + TS, Vite)  ──REST /api/*──►  darkstudio-server (C++20
 | `GET /api/datasets`, `GET …/images?folder=`, `GET …/file?path=`, `GET/PUT …/labels?image=` | Annotation |
 | `GET /api/training/models` | Base models and what is available on this machine: cfg, COCO weights, partial weights, download URL, license |
 | `GET /api/training/datasets` | Folders with labeled images (including sub-folders) and their class names |
+| `GET /api/training/dataset-info?path=` | Labeled images and class names of one dataset folder (relative to `datasets/`, or absolute) |
+| `GET /api/files?path=` | The Browse… window: one folder's entries, its parent, a summary and shortcuts. An empty path lists the drives |
 
 Job kinds: `ov-bench` {device, precision, iterations} · `compare-cpu-sycl` {repeat} · `prepare-legogears` {max_batches} · `train` {backend: sycl|cpu, map, **dataset**, model, width, height, max_batches, batch?, subdivisions?, valid_percent?, pretrained?, learning_rate?, mosaic?, flip?, hue?, saturation?, exposure?, angle?, weights?} (generated files) or {backend, data, cfg, weights?, map} (own files) · `map` {backend, data, cfg, weights, iou}.
 
@@ -88,6 +93,7 @@ WebSocket `/ws/events` messages: `{"type":"job","job":{…}}`, `{"type":"log","j
 
 - The server listens on **127.0.0.1 only** and has **no login**. Accounts and roles come with multi-user mode (M5).
 - Dataset and image APIs can't leave the `datasets/` folder (`../` is rejected; there's a unit test for it).
+- The **file browser** (`/api/files`) lists folder and file **names** anywhere on the machine, never contents, and training can read a dataset folder anywhere. That's acceptable only because the server is local and single-user. Multi-user mode (M5) must restrict it to allowed roots.
 - Jobs run only the configured tools with validated parameters. There's no arbitrary command execution.
 
 ## Licenses of the UI dependencies
